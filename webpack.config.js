@@ -36,7 +36,7 @@ module.exports = {
         new HtmlWebpackPlugin({
             template: './src/index.html',
             filename: 'index.html',
-            chunks: ['flight-sim'],
+            chunks: ['final-project'],
         }),
     ],
     devServer: {
