@@ -4,7 +4,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
     entry: {
-        'final-project': './src/final-project.js',
+        'final-project': './src/render.js',
     },
     output: {
         filename: '[name].js',
