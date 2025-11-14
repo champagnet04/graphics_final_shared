@@ -142,11 +142,7 @@ export function moveElf(){
         return;
     }
 
-    // Get ground height at current position
-    const groundHeight = getHeightAt(elf.position.x, elf.position.z);
-    elf.position.y = groundHeight;
-
-    // Move based on keyboard input
+    // Move based on keyboard input FIRST
     if (keysPressed['w']) {
         elf.position.z -= 0.1;
     }
@@ -159,6 +155,10 @@ export function moveElf(){
     if (keysPressed['d']) {
         elf.position.x += 0.1;
     }
+
+    // Then update ground height at the new position
+    const groundHeight = getHeightAt(elf.position.x, elf.position.z);
+    elf.position.y = groundHeight;
 }
 
 function getHeightAt(x, z){
@@ -185,34 +185,26 @@ function getHeightAt(x, z){
 // Initialize keyboard listeners once
 function initKeyboardListeners(){
     window.addEventListener('keydown', (e) => {
-        switch (e.key.toLowerCase()) {
+        const key = e.key.toLowerCase();
+        switch (key) {
             case 'w':
-                keysPressed['w'] = true;
-                break;
             case 'a':
-                keysPressed['a'] = true;
-                break;
             case 's':
-                keysPressed['s'] = true;
-                break;
             case 'd':
-                keysPressed['d'] = true;
+                keysPressed[key] = true;
+                e.preventDefault(); // Prevent default behavior
                 break;
         }
     });
     window.addEventListener('keyup', (e) => {
-        switch (e.key.toLowerCase()) {
+        const key = e.key.toLowerCase();
+        switch (key) {
             case 'w':
-                keysPressed['w'] = false;
-                break;
             case 'a':
-                keysPressed['a'] = false;
-                break;
             case 's':
-                keysPressed['s'] = false;
-                break;
             case 'd':
-                keysPressed['d'] = false;
+                keysPressed[key] = false;
+                e.preventDefault(); // Prevent default behavior
                 break;
         }
     });
