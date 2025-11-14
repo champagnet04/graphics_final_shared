@@ -1,6 +1,7 @@
 /* global module, require, __dirname */
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
     entry: {
@@ -38,11 +39,25 @@ module.exports = {
             filename: 'index.html',
             chunks: ['final-project'],
         }),
+        new CopyWebpackPlugin({
+            patterns: [
+                {
+                    from: path.resolve(__dirname, 'src', 'models'),
+                    to: path.resolve(__dirname, 'dist', 'models'),
+                },
+            ],
+        }),
     ],
     devServer: {
         compress: true,
         port: 8085,
         hot: true,
+        static: [
+            {
+                directory: path.join(__dirname, 'src', 'models'),
+                publicPath: '/models',
+            },
+        ],
     },
     performance: {
         hints: false,
