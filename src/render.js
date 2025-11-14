@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { setupOutdoorScene } from './outdoor-scene.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+import { moveElf } from './outdoor-scene.js';
+
 // Initialize the scene asynchronously
 async function init() {
     const { scene, camera } = await setupOutdoorScene();
@@ -35,6 +37,7 @@ async function init() {
         requestAnimationFrame(animate);
         controls.update(); // Update controls
         renderer.render(scene, camera);
+        moveElf();
     }
 
     // Start the animation loop

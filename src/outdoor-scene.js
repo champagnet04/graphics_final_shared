@@ -6,6 +6,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 const scene = createScene();
 const camera = setupCamera();
 
+// Store references to ground and elf for later use
+let ground = null;
+let elf = null;
+
+// Track keyboard state
+const keysPressed = {};
+
 function createScene(){
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x181848); // Deep purple-blue night sky
@@ -41,7 +48,7 @@ function createGround(){
         color: 0xffffff, // White color for ground
         side: THREE.DoubleSide // Make it visible from both sides
     });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2; // Rotate plane to be horizontal
     ground.position.y = 0; // Position at ground level
     scene.add(ground);
@@ -105,7 +112,10 @@ async function generateElfAtOrigin(){
         // Use the static file path - webpack dev server serves from /models
         // This ensures both .gltf and .bin files are accessible
         const gltf = await loader.loadAsync('/models/christmas_elf/scene.gltf');
-        const elf = gltf.scene.clone(); // Clone so we can reuse the model
+        elf = gltf.scene.clone(); // Clone so we can reuse the model
+        
+        // Set a name so we can find it later
+        elf.name = 'elf';
         
         // Scale and position the elf
         elf.position.set(0, 0, 0);
@@ -121,8 +131,91 @@ async function generateElfAtOrigin(){
     }
 }
 
-function moveElf(){
-    const elf = scene.children.find(child => child.name === 'elf');
+export function moveElf(){
+    // Find the elf if we don't have a reference yet
+    if (!elf) {
+        elf = scene.children.find(child => child.name === 'elf');
+    }
+    
+    // If elf still doesn't exist, return early
+    if (!elf) {
+        return;
+    }
+
+    // Get ground height at current position
+    const groundHeight = getHeightAt(elf.position.x, elf.position.z);
+    elf.position.y = groundHeight;
+
+    // Move based on keyboard input
+    if (keysPressed['w']) {
+        elf.position.z -= 0.1;
+    }
+    if (keysPressed['a']) {
+        elf.position.x -= 0.1;
+    }
+    if (keysPressed['s']) {
+        elf.position.z += 0.1;
+    }
+    if (keysPressed['d']) {
+        elf.position.x += 0.1;
+    }
+}
+
+function getHeightAt(x, z){
+    if (!ground) {
+        return 0; // Fallback if ground doesn't exist
+    }
+    
+    // Cast a ray downward from above to find ground height
+    const raycaster = new THREE.Raycaster();
+    const origin = new THREE.Vector3(x, 1000, z); // start high above the scene
+    const direction = new THREE.Vector3(0, -1, 0); // straight down
+    raycaster.set(origin, direction);
+
+    const intersects = raycaster.intersectObject(ground, false);
+
+    if (intersects.length > 0) {
+        return intersects[0].point.y;
+    } else {
+        // fallback: could not find intersection
+        return 0; 
+    }
+}
+
+// Initialize keyboard listeners once
+function initKeyboardListeners(){
+    window.addEventListener('keydown', (e) => {
+        switch (e.key.toLowerCase()) {
+            case 'w':
+                keysPressed['w'] = true;
+                break;
+            case 'a':
+                keysPressed['a'] = true;
+                break;
+            case 's':
+                keysPressed['s'] = true;
+                break;
+            case 'd':
+                keysPressed['d'] = true;
+                break;
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        switch (e.key.toLowerCase()) {
+            case 'w':
+                keysPressed['w'] = false;
+                break;
+            case 'a':
+                keysPressed['a'] = false;
+                break;
+            case 's':
+                keysPressed['s'] = false;
+                break;
+            case 'd':
+                keysPressed['d'] = false;
+                break;
+        }
+    });
 }
 
 export async function setupOutdoorScene(){    
@@ -130,6 +223,7 @@ export async function setupOutdoorScene(){
     createGround();
     await generateClouds();
     await generateElfAtOrigin();
+    initKeyboardListeners(); // Initialize keyboard listeners
     return { scene, camera };
 }
 
