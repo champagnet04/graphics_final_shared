@@ -421,9 +421,96 @@ function setChristmasLightColors() {
     return lightColors;
 }
 
+/**
+ * Helper function to add lights in a sequence along an axis
+ * @param {number} start - Starting position along the axis
+ * @param {number} end - Ending position along the axis
+ * @param {string} axis - 'x' or 'z' axis to iterate along
+ * @param {number|null} fixed1 - Fixed value for the other axis (x when axis is 'z', y when axis is 'x')
+ * @param {number|null} fixed2 - Fixed value for z when axis is 'x', or y when axis is 'z'
+ * @param {number} baseY - Base Y coordinate for the lights
+ * @param {number} spacing - Spacing between lights
+ * @param {Array<THREE.Vector3>} points - Array to push the generated points to
+ * @param {number} yOffset - Offset to add to baseY (default: 0.6)
+ */
+function addEdgeLights(start, end, axis, fixed1, fixed2, baseY, spacing, points, yOffset = 0.6) {
+    for (let v = start; v <= end; v += spacing) {
+        let point;
+        if (axis === 'x') {
+            // v is x, fixed2 is z
+            point = new THREE.Vector3(v, baseY + yOffset, fixed2);
+        } else if (axis === 'z') {
+            // fixed1 is x, v is z
+            point = new THREE.Vector3(fixed1, baseY + yOffset, v);
+        }
+        points.push(point);
+    }
+}
 
+function addLightsToFence(size, center){
+    const points = [];
+    const spacing = 0.3; // Spacing between lights
+    
+    // Calculate cottage dimensions in world space
+    const width = size.x;
+    const height = size.y;
+    const depth = size.z;
+    
+    const baseY = center.y / 2;
+    
+    // Front edge
+    const frontZ = center.z + depth / 2;
+    addEdgeLights(center.x - width / 2, (center.x + width / 2) - 12.3, 'x', null, frontZ - 1.7, baseY, spacing, points);
+    addEdgeLights((center.x - width / 2) + 12.8, center.x + width / 2, 'x', null, frontZ - 1.7, baseY, spacing, points);
 
-function addChristmasLightsToCottageFence(){
+    // Back edge
+    const backZ = center.z - depth / 2;
+    addEdgeLights(center.x - width / 2, (center.x + width / 2) - 13, 'x', null, backZ + 1.9, baseY, spacing, points);
+    addEdgeLights((center.x - width / 2) + 13.3, center.x + width / 2, 'x', null, backZ + 1.9, baseY, spacing, points);
+
+    // Left edge
+    const leftX = center.x - width / 2;
+    addEdgeLights((center.z - depth / 2) + 2, (center.z + depth / 2) -2, 'z', leftX, null, baseY, spacing, points);
+
+    // Right edge
+    const rightX = center.x + width / 2;
+    addEdgeLights((center.z - depth / 2) + 2, (center.z + depth / 2) -2, 'z', rightX, null, baseY, spacing, points);
+    
+    return points;
+}
+
+function addLightsToTopFence(size, center){
+    const points = [];
+    const spacing = 0.3; // Spacing between lights
+    
+    // Calculate cottage dimensions in world space
+    const width = size.x;
+    const height = size.y;
+    const depth = size.z;
+    
+    const baseY = center.y / 2;
+
+    //Front edge
+    const frontZ = center.z + depth / 2;
+    addEdgeLights((center.x - width / 2) + 5.25, (center.x + width / 2) - 5, 'x', null, frontZ - 1.7, baseY + 5.25, spacing, points);
+
+    //left edge
+    const leftX = center.x - width / 2;
+    addEdgeLights((center.z - depth / 2) + 14, (center.z + depth / 2) - 2, 'z', leftX + 5.3, null, baseY + 5.25, spacing, points);
+
+    //right edge
+    const rightX = center.x + width / 2;
+    addEdgeLights((center.z - depth / 2) + 14, (center.z + depth / 2) -2, 'z', rightX - 5, null, baseY + 5.25, spacing, points);
+
+    return points;
+}
+
+function addLightsToRoofEdges(size, center){
+    const points = [];
+    const spacing = 0.3; // Spacing between lights
+}
+
+function addChristmasLightsToCottage(){
     // Find the cottage in the scene
     const cottage = getCottage();
     
@@ -435,57 +522,15 @@ function addChristmasLightsToCottageFence(){
     // Christmas light colors (traditional colors)
     const lightColors = setChristmasLightColors();
     
-    const createPoints = () => {
-        const points = [];
-        const spacing = 0.3; // Spacing between lights
-        
-        // Calculate cottage dimensions in world space
-        const width = size.x;
-        const height = size.y;
-        const depth = size.z;
-        
-        // Helper to add lights in a sequence along an axis
-        function addEdgeLights(start, end, axis, fixed1, fixed2, yOffset = 0.6) {
-            for (let v = start; v <= end; v += spacing) {
-                let point;
-                if (axis === 'x') {
-                    // v is x, fixed1 is y, fixed2 is z
-                    point = new THREE.Vector3(v, (center.y / 2) + yOffset, fixed2);
-                } else if (axis === 'z') {
-                    // fixed1 is x, fixed2 is y, v is z
-                    point = new THREE.Vector3(fixed1, (center.y / 2) + yOffset, v);
-                }
-                points.push(point);
-            }
-        }
-
-        // Position lights along the roof edges (top of the cottage)
-        // Front edge
-        const frontZ = center.z + depth / 2;
-        addEdgeLights(center.x - width / 2, (center.x + width / 2) - 12.3, 'x', null, frontZ - 1.7);
-        addEdgeLights((center.x - width / 2) + 12.8, center.x + width / 2, 'x', null, frontZ - 1.7);
-
-        // Back edge
-        const backZ = center.z - depth / 2;
-        addEdgeLights(center.x - width / 2, (center.x + width / 2) - 13, 'x', null, backZ + 1.9);
-        addEdgeLights((center.x - width / 2) + 13.3, center.x + width / 2, 'x', null, backZ + 1.9);
-
-        // Left edge
-        const leftX = center.x - width / 2;
-        addEdgeLights((center.z - depth / 2) + 2, (center.z + depth / 2) -2, 'z', leftX, null);
-
-        // Right edge
-        const rightX = center.x + width / 2;
-        addEdgeLights((center.z - depth / 2) + 2, (center.z + depth / 2) -2, 'z', rightX, null);
-        
-        return points;
-    };
+    const points = addLightsToFence(size, center);
+    const topPoints = addLightsToTopFence(size, center);
     
-    const points = createPoints();
-    const colors = new Float32Array(points.length * 3);
+    // Combine all points into a single array
+    const allPoints = [...points, ...topPoints];
+    const colors = new Float32Array(allPoints.length * 3);
     
     // Assign Christmas light colors in sequence
-    points.forEach((point, i) => {
+    allPoints.forEach((point, i) => {
         const colorIndex = i % lightColors.length;
         const c = new THREE.Color(lightColors[colorIndex]);
         colors[i * 3] = c.r;
@@ -493,7 +538,7 @@ function addChristmasLightsToCottageFence(){
         colors[i * 3 + 2] = c.b;
     });
     
-    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    const geom = new THREE.BufferGeometry().setFromPoints(allPoints);
     geom.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
     
     const material = new THREE.PointsMaterial({
@@ -515,7 +560,7 @@ export async function setupOutdoorScene(){
     await generateClouds();
     await generateElfAtOrigin();
     await generateCottage();
-    addChristmasLightsToCottageFence();
+    addChristmasLightsToCottage();
     initKeyboardListeners(); // Initialize keyboard listeners
     return { scene, camera };
 }
