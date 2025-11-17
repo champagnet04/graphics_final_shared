@@ -841,6 +841,35 @@ export function updateSnow(){
     snow.geometry.attributes.position.needsUpdate = true;
 }
 
+// FROSTED GLASS
+// Semi-transparent with blur effect
+
+function createIceMaterial() {
+    return new THREE.MeshPhysicalMaterial({
+        color: 0xaaddff,
+        metalness: 0.0,
+        roughness: 0.5,       // Higher roughness = more frosted
+        transparent: true,
+        opacity: 0.4,
+        transmission: 0.7,
+        thickness: 0.5,
+        clearcoat: 1.0,       // Adds glossy layer
+        clearcoatRoughness: 0.3,
+        side: THREE.DoubleSide
+    });
+}
+
+function createIcyPond(){
+    const circle = new THREE.Mesh(
+        new THREE.CircleGeometry(25, 64),  // radius, segments
+        createIceMaterial()
+    );
+    circle.rotation.x = -Math.PI / 2;  // Make it horizontal
+    circle.position.x = -30;
+    circle.position.y = -2.5;
+    scene.add(circle);
+}
+
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
@@ -850,6 +879,7 @@ export async function setupOutdoorScene(){
     await generateCottage();
     addChristmasLightsToCottage();
     generateSnow();
+    createIcyPond();
     initKeyboardListeners(); // Initialize keyboard listeners
     return { scene, camera };
 }
