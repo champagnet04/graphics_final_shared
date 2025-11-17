@@ -301,7 +301,6 @@ export function moveElf(){
 
 function getHeightAt(x, z){
     if (!ground) {
-        console.warn('getHeightAt: ground is null');
         return 0; // Fallback if ground doesn't exist
     }
     
@@ -323,13 +322,9 @@ function getHeightAt(x, z){
         const height = intersects[0].point.y;
         return height;
     } else {
-        // Debug: check if ground geometry is valid
-        console.warn(`No intersection found at (${x}, ${z}). Ground position:`, ground.position, 'Ground rotation:', ground.rotation);
-        console.warn('Ground geometry:', ground.geometry);
         // Fallback: calculate height using the same formula as modifyTerrainHeights
         // This is a workaround if raycaster fails
         const calculatedHeight = Math.sin(x * 0.05) * Math.cos(-z * 0.05) * 5;
-        console.warn(`Using calculated height fallback: ${calculatedHeight}`);
         return calculatedHeight;
     }
 }
@@ -389,8 +384,8 @@ function createCottage(){
 }
 
 function createCottageBase(cottageGroup){
-    const cottageBaseGeometry = new THREE.BoxGeometry(10, 10, 10);
-    const cottageBaseMaterial = new THREE.MeshStandardMaterial({ color: 0x8B5A2B }); // brown
+    const cottageBaseGeometry = new THREE.BoxGeometry(10, 7, 10);
+    const cottageBaseMaterial = new THREE.MeshStandardMaterial({ color: 0xd3d3d3 }); // light grey
     const cottageBase = new THREE.Mesh(cottageBaseGeometry, cottageBaseMaterial);
     
     // Get ground height at this position
@@ -398,9 +393,55 @@ function createCottageBase(cottageGroup){
     console.log('Ground height at 25, 10:', groundHeight);
     // BoxGeometry positions by center, so add half the height to place bottom on ground
     const boxHeight = 10; // Height of the box
-    cottageBase.position.set(25, groundHeight + boxHeight / 2, 10);
-    
+    cottageBase.position.set(25, (groundHeight + boxHeight) / 2, 10);
+    addWallTextureToCottageBase(cottageBase, cottageBaseMaterial);
     cottageGroup.add(cottageBase);
+}
+
+function addWallTextureToCottageBase(cottageBase, cottageBaseMaterial){
+    // Add wall texture to the 4 sides (excluding top and bottom)
+    const wallTexture = loadWallTexture();
+    // The box sides in BoxGeometry are indexed in the following order:
+    // 0: right, 1: left, 2: top, 3: bottom, 4: front, 5: back
+    cottageBaseMaterial.map = wallTexture;
+    cottageBaseMaterial.needsUpdate = true;
+    // Set whether each face gets the texture:
+    // We'll use an array of materials per face for more flexibility
+    // Only texture sides 0 (right), 1 (left), 4 (front), and 5 (back)
+    const materials = [];
+    for (let i = 0; i < 6; i++) {
+        if ([0,1,4,5].includes(i)) {
+            // Wall texture for sides
+            materials.push(new THREE.MeshStandardMaterial({ color: 0x8B5C2A, map: wallTexture }));
+        } else {
+            // Solid color for top and bottom
+            materials.push(new THREE.MeshStandardMaterial({ color: 0xd3d3d3 }));
+        }
+    }
+    cottageBase.material = materials;
+}
+
+function loadWallTexture(){
+    const loader = new THREE.TextureLoader();
+    const wallTexture = loader.load(
+        '/textures/brick_wall.png',
+        // onLoad callback
+        (texture) => {
+            // Configure texture wrapping and repeat for tiling
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            // Repeat the texture across the ground (adjust these values to control tile size)
+            texture.repeat.set(5, 5); // Repeat 10 times in each direction
+        },
+        // onProgress callback (optional)
+        undefined,
+        // onError callback
+        (error) => {
+            console.error('Error loading snow texture:', error);
+        }
+    );
+    
+    return wallTexture;
 }
 
 export async function setupOutdoorScene(){    
