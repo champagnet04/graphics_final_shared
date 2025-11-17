@@ -38,8 +38,27 @@ function setupLights(){
     scene.add(ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // bright white light
-    directionalLight.position.set(10, 10, 10); // Position the light
+    directionalLight.position.set(10, 100, 10); // Position the light
+    directionalLight.castShadow = true; // Enable shadow casting
+    
+    // Configure shadow map for directional light
+    // The shadow camera needs to cover the area where shadows will be cast
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 500;
+    // Adjust bounds to cover the ground area where clouds cast shadows
+    directionalLight.shadow.camera.left = -150;
+    directionalLight.shadow.camera.right = 150;
+    directionalLight.shadow.camera.top = 150;
+    directionalLight.shadow.camera.bottom = -150;
+    
+    // Update the shadow camera to look at the scene center
+    directionalLight.target.position.set(0, 0, 0);
+    directionalLight.target.updateMatrixWorld();
+    
     scene.add(directionalLight);
+    scene.add(directionalLight.target); // Add target to scene
 }
 
 /**
@@ -82,15 +101,54 @@ function createGround(){
     
     // Modify the terrain to create smooth hills
     modifyTerrainHeights(groundGeometry);
-    
+
+    const snowTexture = loadSnowTexture();
     const groundMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0xffffff, // White color for ground
-        side: THREE.DoubleSide // Make it visible from both sides
+        color: 0xffffff, // Base color (will be multiplied with texture)
+        side: THREE.DoubleSide, // Make it visible from both sides
+        map: snowTexture // Diffuse texture map
     });
+    
+    // Update material when texture loads (in case it loads asynchronously)
+    snowTexture.addEventListener('load', () => {
+        groundMaterial.needsUpdate = true;
+        console.log('Snow texture loaded successfully');
+    });
+
     ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2; // Rotate plane to be horizontal
     ground.position.y = 0; // Position at ground level
+    ground.castShadow = true;
+    ground.receiveShadow = true;
     scene.add(ground);
+}
+
+function loadSnowTexture(){
+    const loader = new THREE.TextureLoader();
+    const snowTexture = loader.load(
+        '/textures/snow.png',
+        // onLoad callback
+        (texture) => {
+            // Configure texture wrapping and repeat for tiling
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            // Repeat the texture across the ground (adjust these values to control tile size)
+            texture.repeat.set(10, 10); // Repeat 10 times in each direction
+        },
+        // onProgress callback (optional)
+        undefined,
+        // onError callback
+        (error) => {
+            console.error('Error loading snow texture:', error);
+        }
+    );
+    
+    // Set wrapping and repeat immediately (in case texture loads synchronously)
+    snowTexture.wrapS = THREE.RepeatWrapping;
+    snowTexture.wrapT = THREE.RepeatWrapping;
+    snowTexture.repeat.set(10, 10);
+    
+    return snowTexture;
 }
 
 /**
@@ -98,11 +156,27 @@ function createGround(){
  * @returns {THREE.Vector3} A random position for a cloud in the sky
  */
 function generateCloudPosition(){
-    const cloudPosition = new THREE.Vector3(
-        Math.random() * 200 - 100,
-        Math.random() * 10 + 10,
-        Math.random() * 100 - 50
-    );
+    // Keep track of previously generated cloud positions in this session
+    if (!generateCloudPosition.pastPositions) {
+        generateCloudPosition.pastPositions = [];
+    }
+    let attempt = 0;
+    let cloudPosition;
+    do {
+        cloudPosition = new THREE.Vector3(
+            Math.random() * 200 - 100, // x: -100 to 100
+            Math.random() * 10 + 10,   // y: 10 to 20
+            Math.random() * 100 - 50   // z: -50 to 50
+        );
+        // Check whether this candidate is at least 5 units away from all existing
+        var tooClose = generateCloudPosition.pastPositions.some(pos => 
+            pos.distanceTo(cloudPosition) < 5
+        );
+        attempt++;
+    } while (tooClose && attempt < 100);
+
+    generateCloudPosition.pastPositions.push(cloudPosition);
+    
     return cloudPosition;
 }
 
@@ -124,6 +198,16 @@ async function createCloud(){
         // The model might be large, so we may need to scale it down
         // Adjust scale as needed based on the model size
         cloud.scale.setScalar(0.01); // Scale down if needed
+        
+        // Enable shadows on the group and all its children (meshes)
+        // cloud.castShadow = true;
+        // cloud.receiveShadow = true;
+        cloud.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
         
         scene.add(cloud);
         return cloud;
@@ -265,9 +349,30 @@ function initKeyboardListeners(){
     });
 }
 
+function createMoon(){
+    const moonGeometry = new THREE.SphereGeometry(1, 32, 32);
+    const moonMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    moon.position.set(0, 50, 0);
+    // Create a point light to represent the moon's illumination
+    const moonLight = new THREE.PointLight(0xffffff, 1.5, 1000); // (color, intensity, distance)
+    moonLight.position.copy(moon.position);
+    moonLight.castShadow = true;
+    
+    // Configure shadow map for the point light
+    moonLight.shadow.mapSize.width = 2048;
+    moonLight.shadow.mapSize.height = 2048;
+    moonLight.shadow.camera.near = 0.5;
+    moonLight.shadow.camera.far = 1000;
+    
+    scene.add(moonLight);
+    scene.add(moon);
+}
+
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
+    createMoon();
     await generateClouds();
     await generateElfAtOrigin();
     initKeyboardListeners(); // Initialize keyboard listeners

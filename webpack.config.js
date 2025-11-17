@@ -45,6 +45,10 @@ module.exports = {
                     from: path.resolve(__dirname, 'src', 'models'),
                     to: path.resolve(__dirname, 'dist', 'models'),
                 },
+                {
+                    from: path.resolve(__dirname, 'src', 'textures'),
+                    to: path.resolve(__dirname, 'dist', 'textures'),
+                },
             ],
         }),
     ],
@@ -56,6 +60,10 @@ module.exports = {
             {
                 directory: path.join(__dirname, 'src', 'models'),
                 publicPath: '/models',
+            },
+            {
+                directory: path.join(__dirname, 'src', 'textures'),
+                publicPath: '/textures',
             },
         ],
     },

@@ -16,6 +16,8 @@ async function init() {
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true; // Enable shadow rendering
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Use soft shadows
     document.body.appendChild(renderer.domElement);
 
     // Initialize OrbitControls after renderer is created
