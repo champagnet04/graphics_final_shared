@@ -8,8 +8,9 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 const scene = createScene();
 const camera = setupCamera();
 
-// Store references to ground and elf for later use
+// Store references to ground, pond, and elf for later use
 let ground = null;
+let pond = null;
 let elf = null;
 
 //global ground bounds
@@ -311,34 +312,71 @@ export function moveElf(){
     elf.position.y = groundHeight;
 }
 
+/**
+ * LATER ON YOU NEED TO EXTRACT A HELPER THAT YOU CAN PASS GROUND & POND TO
+ * @param {} x 
+ * @param {*} z 
+ * @returns 
+ */
 function getHeightAt(x, z){
-    if (!ground) {
-        return 0; // Fallback if ground doesn't exist
+    let groundHeight = 0;
+    let pondHeight = null;
+    
+    // Check ground height
+    if (ground) {
+        // Ensure ground matrix is up to date
+        ground.updateMatrixWorld();
+        
+        // Cast a ray downward from above to find ground height
+        const raycaster = new THREE.Raycaster();
+        const origin = new THREE.Vector3(x, 1000, z); // start high above the scene
+        const direction = new THREE.Vector3(0, -1, 0); // straight down
+        raycaster.set(origin, direction);
+
+        const intersects = raycaster.intersectObject(ground, false);
+
+        if (intersects.length > 0) {
+            groundHeight = intersects[0].point.y;
+        } else {
+            // Fallback: calculate height using the same formula as modifyTerrainHeights
+            groundHeight = Math.sin(x * 0.05) * Math.cos(-z * 0.05) * 5;
+        }
     }
     
-    // Ensure ground matrix is up to date
-    ground.updateMatrixWorld();
-    
-    // Cast a ray downward from above to find ground height
-    const raycaster = new THREE.Raycaster();
-    const origin = new THREE.Vector3(x, 1000, z); // start high above the scene
-    const direction = new THREE.Vector3(0, -1, 0); // straight down
-    raycaster.set(origin, direction);
-
-    // Use intersectObject - try both recursive and non-recursive
-    // For a single mesh, recursive shouldn't matter, but let's try it
-    const intersects = raycaster.intersectObject(ground, false);
-
-    if (intersects.length > 0) {
-        // Return the Y coordinate of the intersection point in world space
-        const height = intersects[0].point.y;
-        return height;
-    } else {
-        // Fallback: calculate height using the same formula as modifyTerrainHeights
-        // This is a workaround if raycaster fails
-        const calculatedHeight = Math.sin(x * 0.05) * Math.cos(-z * 0.05) * 5;
-        return calculatedHeight;
+    // Check pond height if pond exists
+    if (pond) {
+        // Update pond matrix
+        pond.updateMatrixWorld();
+        
+        // Check if point is within the pond's circle
+        const pondCenterX = pond.position.x;
+        const pondCenterZ = pond.position.z;
+        const pondRadius = 25; // CircleGeometry radius
+        
+        const distanceFromCenter = Math.sqrt(
+            Math.pow(x - pondCenterX, 2) + Math.pow(z - pondCenterZ, 2)
+        );
+        
+        if (distanceFromCenter <= pondRadius) {
+            // Point is within the pond, get pond height
+            const raycaster = new THREE.Raycaster();
+            const origin = new THREE.Vector3(x, 1000, z);
+            const direction = new THREE.Vector3(0, -1, 0);
+            raycaster.set(origin, direction);
+            
+            const intersects = raycaster.intersectObject(pond, false);
+            if (intersects.length > 0) {
+                pondHeight = intersects[0].point.y;
+            }
+        }
     }
+    
+    // Return the higher of the two heights (elf walks on top of whichever is higher)
+    if (pondHeight !== null) {
+        return Math.max(groundHeight, pondHeight);
+    }
+    
+    return groundHeight;
 }
 
 // Initialize keyboard listeners once
@@ -841,9 +879,6 @@ export function updateSnow(){
     snow.geometry.attributes.position.needsUpdate = true;
 }
 
-// FROSTED GLASS
-// Semi-transparent with blur effect
-
 function createIceMaterial() {
     return new THREE.MeshPhysicalMaterial({
         color: 0xaaddff,
@@ -867,7 +902,9 @@ function createIcyPond(){
     circle.rotation.x = -Math.PI / 2;  // Make it horizontal
     circle.position.x = -30;
     circle.position.y = -2.5;
+    circle.name = 'pond';
     scene.add(circle);
+    pond = circle; // Store reference for height calculations
 }
 
 export async function setupOutdoorScene(){    
