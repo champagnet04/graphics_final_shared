@@ -357,25 +357,25 @@ function initKeyboardListeners(){
     });
 }
 
-function createMoon(){
-    const moonGeometry = new THREE.SphereGeometry(1, 32, 32);
-    const moonMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
-    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
-    moon.position.set(0, 50, 0);
-    // Create a point light to represent the moon's illumination
-    const moonLight = new THREE.PointLight(0xffffff, 1.5, 1000); // (color, intensity, distance)
-    moonLight.position.copy(moon.position);
-    moonLight.castShadow = true;
+// function createMoon(){
+//     const moonGeometry = new THREE.SphereGeometry(1, 32, 32);
+//     const moonMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+//     const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+//     moon.position.set(0, 50, 0);
+//     // Create a point light to represent the moon's illumination
+//     const moonLight = new THREE.PointLight(0xffffff, 1.5, 1000); // (color, intensity, distance)
+//     moonLight.position.copy(moon.position);
+//     moonLight.castShadow = true;
     
-    // Configure shadow map for the point light
-    moonLight.shadow.mapSize.width = 2048;
-    moonLight.shadow.mapSize.height = 2048;
-    moonLight.shadow.camera.near = 0.5;
-    moonLight.shadow.camera.far = 1000;
+//     // Configure shadow map for the point light
+//     moonLight.shadow.mapSize.width = 2048;
+//     moonLight.shadow.mapSize.height = 2048;
+//     moonLight.shadow.camera.near = 0.5;
+//     moonLight.shadow.camera.far = 1000;
     
-    scene.add(moonLight);
-    scene.add(moon);
-}
+//     scene.add(moonLight);
+//     scene.add(moon);
+// }
 
 async function generateCottage(){
     const loader = new GLTFLoader();
@@ -400,13 +400,120 @@ async function generateCottage(){
     }
 }
 
+function getCottage(){
+    const cottage = scene.children.find(child => child.name === 'cottage');
+    if (!cottage) {
+        console.warn('Cottage not found');
+        return null;
+    }
+    return cottage;
+}
+
+function setChristmasLightColors() {
+    const lightColors = [
+        0xff0000, // Red
+        0x00ff00, // Green
+        0xffff00, // Yellow
+        0x0000ff, // Blue
+        0xff00ff, // Magenta
+        0x00ffff, // Cyan
+    ];
+    return lightColors;
+}
+
+
+
+function addChristmasLightsToCottageFence(){
+    // Find the cottage in the scene
+    const cottage = getCottage();
+    
+    // Calculate the cottage's bounding box to get its dimensions
+    const box = new THREE.Box3().setFromObject(cottage);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    
+    // Christmas light colors (traditional colors)
+    const lightColors = setChristmasLightColors();
+    
+    const createPoints = () => {
+        const points = [];
+        const spacing = 0.3; // Spacing between lights
+        
+        // Calculate cottage dimensions in world space
+        const width = size.x;
+        const height = size.y;
+        const depth = size.z;
+        
+        // Helper to add lights in a sequence along an axis
+        function addEdgeLights(start, end, axis, fixed1, fixed2, yOffset = 0.6) {
+            for (let v = start; v <= end; v += spacing) {
+                let point;
+                if (axis === 'x') {
+                    // v is x, fixed1 is y, fixed2 is z
+                    point = new THREE.Vector3(v, (center.y / 2) + yOffset, fixed2);
+                } else if (axis === 'z') {
+                    // fixed1 is x, fixed2 is y, v is z
+                    point = new THREE.Vector3(fixed1, (center.y / 2) + yOffset, v);
+                }
+                points.push(point);
+            }
+        }
+
+        // Position lights along the roof edges (top of the cottage)
+        // Front edge
+        const frontZ = center.z + depth / 2;
+        addEdgeLights(center.x - width / 2, center.x + width / 2, 'x', null, frontZ - 1.7);
+
+        // Back edge
+        const backZ = center.z - depth / 2;
+        addEdgeLights(center.x - width / 2, center.x + width / 2, 'x', null, backZ + 1.9);
+
+        // Left edge
+        const leftX = center.x - width / 2;
+        addEdgeLights((center.z - depth / 2) + 2, (center.z + depth / 2) -2, 'z', leftX, null);
+
+        // Right edge
+        const rightX = center.x + width / 2;
+        addEdgeLights((center.z - depth / 2) + 2, (center.z + depth / 2) -2, 'z', rightX, null);
+        
+        return points;
+    };
+    
+    const points = createPoints();
+    const colors = new Float32Array(points.length * 3);
+    
+    // Assign Christmas light colors in sequence
+    points.forEach((point, i) => {
+        const colorIndex = i % lightColors.length;
+        const c = new THREE.Color(lightColors[colorIndex]);
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+    });
+    
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
+    
+    const material = new THREE.PointsMaterial({
+        size: 0.15, // Slightly larger for visibility
+        vertexColors: true,
+        color: 0xffffff
+    });
+    
+    const christmasLights = new THREE.Points(geom, material);
+    scene.add(christmasLights);
+    
+    return christmasLights;
+}
+
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
-    createMoon();
+    //createMoon();
     await generateClouds();
     await generateElfAtOrigin();
     await generateCottage();
+    addChristmasLightsToCottageFence();
     initKeyboardListeners(); // Initialize keyboard listeners
     return { scene, camera };
 }
