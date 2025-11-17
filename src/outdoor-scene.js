@@ -447,6 +447,32 @@ function addEdgeLights(start, end, axis, fixed1, fixed2, baseY, spacing, points,
     }
 }
 
+/**
+ * Helper function to add lights along a diagonal line between two 3D points
+ * @param {THREE.Vector3} startPoint - Starting 3D point
+ * @param {THREE.Vector3} endPoint - Ending 3D point
+ * @param {number} spacing - Spacing between lights (in world units)
+ * @param {Array<THREE.Vector3>} points - Array to push the generated points to
+ */
+function addDiagonalLights(startPoint, endPoint, spacing, points) {
+    // Calculate the direction vector and distance
+    const direction = new THREE.Vector3().subVectors(endPoint, startPoint);
+    const distance = direction.length();
+    
+    // Normalize the direction
+    direction.normalize();
+    
+    // Generate points along the line
+    for (let t = 0; t < distance - 0.01; t += spacing) {
+        const point = new THREE.Vector3().copy(startPoint);
+        point.addScaledVector(direction, t);
+        points.push(point);
+    }
+    
+    // Always include the end point (this allows segments to connect properly)
+    points.push(endPoint.clone());
+}
+
 function addLightsToFence(size, center){
     const points = [];
     const spacing = 0.3; // Spacing between lights
@@ -508,6 +534,77 @@ function addLightsToTopFence(size, center){
 function addLightsToRoofEdges(size, center){
     const points = [];
     const spacing = 0.3; // Spacing between lights
+    
+    // Calculate cottage dimensions in world space
+    const width = size.x;
+    const height = size.y;
+    const depth = size.z;
+    
+    // Calculate the base height and roof peak height (lowered)
+    const baseHeight = center.y + height / 2; // Top of the walls
+    const roofPeakHeight = baseHeight - 1.75; // Peak of the roof (lowered)
+    
+    // Left side roof edge: goes from front edge, up to peak, down to back edge
+    const leftX = center.x - width / 2 + 1; // Left edge X position (matching top fence)
+    const frontZ = center.z + depth / 2 - 6; // Front edge Z position
+    const backZ = center.z - depth / 2 + 6; // Back edge Z position
+    
+    // Front edge of left roof (lower Y)
+    const leftFrontEdge = new THREE.Vector3(
+        leftX,
+        baseHeight - 8,  // Lower edge of roof (lowered)
+        frontZ
+    );
+    
+    // Peak of roof along left side (highest Y, center in Z)
+    const leftPeak = new THREE.Vector3(
+        leftX,
+        roofPeakHeight,   // Peak height
+        center.z          // Center of roof in Z
+    );
+    
+    // Back edge of left roof (lower Y)
+    const leftBackEdge = new THREE.Vector3(
+        leftX,
+        baseHeight - 8,  // Lower edge of roof (lowered)
+        backZ
+    );
+    
+    // Add lights going up the front-left side of the roof
+    addDiagonalLights(leftFrontEdge, leftPeak, spacing, points);
+    // Add lights going down the back-left side of the roof
+    addDiagonalLights(leftPeak, leftBackEdge, spacing, points);
+    
+    // Right side roof edge: same pattern
+    const rightX = center.x + width / 2 - 0.75; // Right edge X position (matching top fence)
+    
+    // Front edge of right roof (lower Y)
+    const rightFrontEdge = new THREE.Vector3(
+        rightX,
+        baseHeight - 8,  // Lower edge of roof (lowered)
+        frontZ
+    );
+    
+    // Peak of roof along right side (highest Y, center in Z)
+    const rightPeak = new THREE.Vector3(
+        rightX,
+        roofPeakHeight,   // Peak height
+        center.z          // Center of roof in Z
+    );
+    
+    // Back edge of right roof (lower Y)
+    const rightBackEdge = new THREE.Vector3(
+        rightX,
+        baseHeight - 8,  // Lower edge of roof (lowered)
+        backZ
+    );
+    
+    // Add lights going up the front-right side of the roof
+    addDiagonalLights(rightFrontEdge, rightPeak, spacing, points);
+    // Add lights going down the back-right side of the roof
+    addDiagonalLights(rightPeak, rightBackEdge, spacing, points);
+    
+    return points;
 }
 
 function addChristmasLightsToCottage(){
@@ -524,9 +621,10 @@ function addChristmasLightsToCottage(){
     
     const points = addLightsToFence(size, center);
     const topPoints = addLightsToTopFence(size, center);
+    const roofPoints = addLightsToRoofEdges(size, center);
     
     // Combine all points into a single array
-    const allPoints = [...points, ...topPoints];
+    const allPoints = [...points, ...topPoints, ...roofPoints];
     const colors = new Float32Array(allPoints.length * 3);
     
     // Assign Christmas light colors in sequence
