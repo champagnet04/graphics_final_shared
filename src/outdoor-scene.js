@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 
 //this file will setup the outdoor scene
 //it is incredibly important that we break down EVERYTHING into as many smaller functions as possible
@@ -357,46 +359,62 @@ function initKeyboardListeners(){
     });
 }
 
-// function createMoon(){
-//     const moonGeometry = new THREE.SphereGeometry(1, 32, 32);
-//     const moonMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
-//     const moon = new THREE.Mesh(moonGeometry, moonMaterial);
-//     moon.position.set(0, 50, 0);
-//     // Create a point light to represent the moon's illumination
-//     const moonLight = new THREE.PointLight(0xffffff, 1.5, 1000); // (color, intensity, distance)
-//     moonLight.position.copy(moon.position);
-//     moonLight.castShadow = true;
-    
-//     // Configure shadow map for the point light
-//     moonLight.shadow.mapSize.width = 2048;
-//     moonLight.shadow.mapSize.height = 2048;
-//     moonLight.shadow.camera.near = 0.5;
-//     moonLight.shadow.camera.far = 1000;
-    
-//     scene.add(moonLight);
-//     scene.add(moon);
-// }
-
-async function generateCottage(){
+async function generateCottage() {
     const loader = new GLTFLoader();
+    
     try {
-        // Use the static file path - webpack dev server serves from /models
-        // This ensures both .gltf and .bin files are accessible
         const gltf = await loader.loadAsync('/models/winter_house/scene.gltf');
-        const cottage = gltf.scene.clone(); // Clone so we can reuse the model
-        
+        const cottage = gltf.scene.clone();
         cottage.name = 'cottage';
         
         const groundHeight = getHeightAt(25, 10);
         cottage.position.set(25, (groundHeight + 7) / 2, 10);
-        
-        cottage.scale.setScalar(0.009); // Scale down if needed
+        cottage.scale.setScalar(0.009);
         cottage.rotation.y = Math.PI;
         
+        // Material color mapping from the GLTF file
+        const materialColors = {
+            'testTile': new THREE.Color(0.0550536, 0.0564653, 0.0649351),     // Dark gray roof
+            'panel': new THREE.Color(0.345098, 0.509804, 0.564706),            // Blue siding
+            'housePaint': new THREE.Color(0.815686, 0.811765, 0.843137),       // Light gray/white
+            'snow': new THREE.Color(1.0, 1.0, 1.0),                            // White snow
+            'chimney': new THREE.Color(1.0, 1.0, 1.0),                         // Chimney (has texture)
+            'windowFrame': new THREE.Color(0.905882, 0.85098, 0.901961),       // Light window frames
+            'windowGlass': new THREE.Color(0.013200, 0.09649, 0.09649)         // Dark teal glass
+        };
+        
+        cottage.traverse((child) => {
+            if (child.isMesh && child.material) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                const matName = child.material.name;
+                const targetColor = materialColors[matName];
+                
+                if (targetColor) {
+                    // Create new material with correct color
+                    child.material = new THREE.MeshStandardMaterial({
+                        color: targetColor,
+                        map: child.material.map || null,  // Keep texture if exists
+                        metalness: 0.0,
+                        roughness: 0.6,
+                        side: THREE.DoubleSide,
+                        transparent: matName === 'windowGlass',
+                        opacity: matName === 'windowGlass' ? 0.5 : 1.0
+                    });
+                    
+                    console.log(`Set ${matName} to RGB(${targetColor.r * 255}, ${targetColor.g * 255}, ${targetColor.b * 255})`);
+                } else {
+                    console.warn(`Unknown material: ${matName}`);
+                }
+            }
+        });
+        
         scene.add(cottage);
+        console.log('Cottage loaded with manual material colors');
         return cottage;
     } catch (error) {
-        console.error('Cant load model:', error);
+        console.error('Can\'t load model:', error);
     }
 }
 
