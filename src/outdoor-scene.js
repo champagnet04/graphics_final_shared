@@ -12,6 +12,16 @@ const camera = setupCamera();
 let ground = null;
 let elf = null;
 
+//global ground bounds
+const groundBounds = {
+    xMin: -100,
+    xMax: 100,
+    zMin: -50,
+    zMax: 50,
+    yMin: -10,
+    yMax: 100
+};
+
 // Track keyboard state
 const keysPressed = {};
 
@@ -410,21 +420,46 @@ async function generateCottage() {
             }
         });
         
-        scene.add(cottage);
+        // Create a group for the cottage and its lights
+        const cottageGroup = new THREE.Group();
+        cottageGroup.name = 'cottageGroup';
+        cottageGroup.add(cottage);
+        
+        // Position the group in the scene
+        scene.add(cottageGroup);
         console.log('Cottage loaded with manual material colors');
-        return cottage;
+        return cottageGroup;
     } catch (error) {
         console.error('Can\'t load model:', error);
     }
 }
 
 function getCottage(){
+    // First try to find the cottage group
+    const cottageGroup = scene.children.find(child => child.name === 'cottageGroup');
+    if (cottageGroup) {
+        // Find the cottage within the group
+        const cottage = cottageGroup.children.find(child => child.name === 'cottage');
+        if (cottage) {
+            return cottage;
+        }
+    }
+    // Fallback: try to find cottage directly in scene (for backwards compatibility)
     const cottage = scene.children.find(child => child.name === 'cottage');
     if (!cottage) {
         console.warn('Cottage not found');
         return null;
     }
     return cottage;
+}
+
+function getCottageGroup(){
+    const cottageGroup = scene.children.find(child => child.name === 'cottageGroup');
+    if (!cottageGroup) {
+        console.warn('Cottage group not found');
+        return null;
+    }
+    return cottageGroup;
 }
 
 function setChristmasLightColors() {
@@ -644,13 +679,26 @@ function addLightsToRoofEdges(size, center){
 }
 
 function addChristmasLightsToCottage(){
-    // Find the cottage in the scene
+    // Find the cottage and group
     const cottage = getCottage();
+    const cottageGroup = getCottageGroup();
+    
+    if (!cottage) {
+        console.warn('Cottage not found, cannot add lights');
+        return null;
+    }
+    
+    // Update matrices to ensure world space calculations are correct
+    cottage.updateMatrixWorld(true);
     
     // Calculate the cottage's bounding box to get its dimensions
     const box = new THREE.Box3().setFromObject(cottage);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
+    
+    // The bounding box center is in world space, but since the cottage group
+    // is at the origin (0,0,0), world space coordinates = group local space coordinates
+    // So we can use the center directly for positioning lights in the group
     
     // Christmas light colors (traditional colors)
     const lightColors = setChristmasLightColors();
@@ -683,19 +731,125 @@ function addChristmasLightsToCottage(){
     });
     
     const christmasLights = new THREE.Points(geom, material);
-    scene.add(christmasLights);
+    christmasLights.name = 'christmasLights';
+    
+    // Add lights to the cottage group instead of the scene
+    if (cottageGroup) {
+        cottageGroup.add(christmasLights);
+    } else {
+        // Fallback: add to scene if group not found
+        console.warn('Cottage group not found, adding lights to scene');
+        scene.add(christmasLights);
+    }
     
     return christmasLights;
+}
+
+function setupSnowPoints(){
+    const count = 25000;
+      
+    
+    // Create particle positions
+    const points = [];
+    for (let i = 0; i < count; i++) {
+        let particle = new THREE.Vector3(
+            Math.random() * (groundBounds.xMax - groundBounds.xMin) + groundBounds.xMin,  // x: -100 to 100
+            Math.random() * (groundBounds.yMax - groundBounds.yMin) + groundBounds.yMin,  // y: 0 to 100 (falling from above)
+            Math.random() * (groundBounds.zMax - groundBounds.zMin) + groundBounds.zMin   // z: -50 to 50
+        );
+        points.push(particle);
+    }
+    
+    // Create velocity array
+    const velocityArray = new Float32Array(count * 2);
+    for (let i = 0; i < count * 2; i += 2) {
+        velocityArray[i] = ((Math.random() - 0.5) / 5) * 0.1;
+        velocityArray[i + 1] = (Math.random() / 5) * 0.1 + 0.01;
+    }
+    
+    // Create geometry
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    geom.setAttribute('velocity', new THREE.BufferAttribute(velocityArray, 2));
+    
+    // Create material for snow
+    const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.05,
+        transparent: true,
+        opacity: 0.8
+    });
+    
+    // Create points object
+    const snowPoints = new THREE.Points(geom, material);
+    snowPoints.name = 'snow';
+    
+    return snowPoints;
+}
+
+function generateSnow(){
+    const snowPoints = setupSnowPoints();
+    scene.add(snowPoints);
+    return snowPoints;
+}
+
+/**
+ * Updates snow particle positions based on their velocities
+ * Should be called every frame in the render loop
+ */
+export function updateSnow(){
+    const snow = scene.children.find(child => child.name === 'snow');
+    if (!snow) {
+        return;
+    }
+    
+    const positionArray = snow.geometry.attributes.position.array;
+    const velocityArray = snow.geometry.attributes.velocity.array;
+    
+    for (let i = 0; i < snow.geometry.attributes.position.count; i++) {
+        const velocityX = velocityArray[i * 2];
+        const velocityY = velocityArray[i * 2 + 1];
+        
+        // Update positions
+        positionArray[i * 3] += velocityX;     // x
+        positionArray[i * 3 + 1] -= velocityY; // y (falling down)
+        // z doesn't have velocity in the current setup
+        
+        // Wrap around x boundaries
+        if (positionArray[i * 3] < groundBounds.xMin) {
+            positionArray[i * 3] = groundBounds.xMax;
+        } else if (positionArray[i * 3] > groundBounds.xMax) {
+            positionArray[i * 3] = groundBounds.xMin;
+        }
+        
+        // Wrap around y boundaries (when snow falls below ground, reset to top)
+        if (positionArray[i * 3 + 1] < groundBounds.yMin) {
+            positionArray[i * 3 + 1] = groundBounds.yMax;
+            // Also randomize x position when wrapping to create continuous snowfall
+            positionArray[i * 3] = Math.random() * (groundBounds.xMax - groundBounds.xMin) + groundBounds.xMin;
+        } else if (positionArray[i * 3 + 1] > groundBounds.yMax) {
+            positionArray[i * 3 + 1] = groundBounds.yMin;
+        }
+        
+        // Wrap around z boundaries
+        if (positionArray[i * 3 + 2] < groundBounds.zMin) {
+            positionArray[i * 3 + 2] = groundBounds.zMax;
+        } else if (positionArray[i * 3 + 2] > groundBounds.zMax) {
+            positionArray[i * 3 + 2] = groundBounds.zMin;
+        }
+    }
+    
+    snow.geometry.attributes.position.needsUpdate = true;
 }
 
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
     //createMoon();
-    await generateClouds();
+    //await generateClouds();
     await generateElfAtOrigin();
     await generateCottage();
     addChristmasLightsToCottage();
+    generateSnow();
     initKeyboardListeners(); // Initialize keyboard listeners
     return { scene, camera };
 }
