@@ -42,8 +42,47 @@ function setupLights(){
     scene.add(directionalLight);
 }
 
+/**
+ * Modifies the terrain geometry to create smooth hills
+ * Uses sine/cosine functions for natural-looking height variation
+ * @param {THREE.BufferGeometry} geometry - The ground geometry to modify
+ */
+function modifyTerrainHeights(geometry) {
+    const positions = geometry.attributes.position;
+    const vertex = new THREE.Vector3();
+    
+    // Loop through all vertices
+    for (let i = 0; i < positions.count; i++) {
+        // Get the current vertex position
+        vertex.fromBufferAttribute(positions, i);
+        
+        // PlaneGeometry is created in XY plane (Z=0), but after -90° rotation around X:
+        // - X stays X (width in world space)
+        // - Y becomes -Z (depth in world space)
+        // - Z becomes Y (height/up in world space)
+        // So we use vertex.x and vertex.y to calculate height variation,
+        // then set the Z component (which becomes Y/up after rotation)
+        const height = Math.sin(vertex.x * 0.05) * Math.cos(vertex.y * 0.05) * 5;
+        
+        // Modify the Z component (which will become the Y/up direction after rotation)
+        positions.setZ(i, height);
+    }
+    
+    // Mark the position attribute as needing an update
+    positions.needsUpdate = true;
+    
+    // Recalculate normals for proper lighting
+    geometry.computeVertexNormals();
+}
+
 function createGround(){
-    const groundGeometry = new THREE.PlaneGeometry(200, 100);
+    // Increase segments for smoother hills (widthSegments, heightSegments)
+    // More segments = more vertices = smoother terrain
+    const groundGeometry = new THREE.PlaneGeometry(200, 100, 50, 25);
+    
+    // Modify the terrain to create smooth hills
+    modifyTerrainHeights(groundGeometry);
+    
     const groundMaterial = new THREE.MeshStandardMaterial({ 
         color: 0xffffff, // White color for ground
         side: THREE.DoubleSide // Make it visible from both sides
