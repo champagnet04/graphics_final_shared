@@ -462,11 +462,13 @@ function addChristmasLightsToCottageFence(){
         // Position lights along the roof edges (top of the cottage)
         // Front edge
         const frontZ = center.z + depth / 2;
-        addEdgeLights(center.x - width / 2, center.x + width / 2, 'x', null, frontZ - 1.7);
+        addEdgeLights(center.x - width / 2, (center.x + width / 2) - 12.3, 'x', null, frontZ - 1.7);
+        addEdgeLights((center.x - width / 2) + 12.8, center.x + width / 2, 'x', null, frontZ - 1.7);
 
         // Back edge
         const backZ = center.z - depth / 2;
-        addEdgeLights(center.x - width / 2, center.x + width / 2, 'x', null, backZ + 1.9);
+        addEdgeLights(center.x - width / 2, (center.x + width / 2) - 13, 'x', null, backZ + 1.9);
+        addEdgeLights((center.x - width / 2) + 13.3, center.x + width / 2, 'x', null, backZ + 1.9);
 
         // Left edge
         const leftX = center.x - width / 2;
