@@ -145,15 +145,31 @@ export function moveElf(){
     // Move based on keyboard input FIRST
     if (keysPressed['w']) {
         elf.position.z -= 0.1;
+        // Make the elf face the -z direction when moving forward ('w')
+        if (elf) {
+            elf.rotation.y = Math.PI;
+        }
     }
     if (keysPressed['a']) {
         elf.position.x -= 0.1;
+        // Make the elf face the -x direction when moving forward ('a')
+        if (elf) {
+            elf.rotation.y = -Math.PI / 2;
+        }
     }
     if (keysPressed['s']) {
         elf.position.z += 0.1;
+        // Make the elf face the z direction when moving forward ('s')
+        if (elf) {
+            elf.rotation.y = 0;
+        }
     }
     if (keysPressed['d']) {
         elf.position.x += 0.1;
+        // Make the elf face the x direction when moving forward ('d')
+        if (elf) {
+            elf.rotation.y = Math.PI / 2;
+        }
     }
 
     // Then update ground height at the new position
