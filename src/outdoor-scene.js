@@ -95,8 +95,7 @@ function modifyTerrainHeights(geometry) {
 }
 
 function createGround(){
-    // Increase segments for smoother hills (widthSegments, heightSegments)
-    // More segments = more vertices = smoother terrain
+    // TO DO: make the ground smoother (get rid of the lines and make it smooth)
     const groundGeometry = new THREE.PlaneGeometry(200, 100, 50, 25);
     
     // Modify the terrain to create smooth hills
@@ -302,8 +301,12 @@ export function moveElf(){
 
 function getHeightAt(x, z){
     if (!ground) {
+        console.warn('getHeightAt: ground is null');
         return 0; // Fallback if ground doesn't exist
     }
+    
+    // Ensure ground matrix is up to date
+    ground.updateMatrixWorld();
     
     // Cast a ray downward from above to find ground height
     const raycaster = new THREE.Raycaster();
@@ -311,13 +314,23 @@ function getHeightAt(x, z){
     const direction = new THREE.Vector3(0, -1, 0); // straight down
     raycaster.set(origin, direction);
 
+    // Use intersectObject - try both recursive and non-recursive
+    // For a single mesh, recursive shouldn't matter, but let's try it
     const intersects = raycaster.intersectObject(ground, false);
 
     if (intersects.length > 0) {
-        return intersects[0].point.y;
+        // Return the Y coordinate of the intersection point in world space
+        const height = intersects[0].point.y;
+        return height;
     } else {
-        // fallback: could not find intersection
-        return 0; 
+        // Debug: check if ground geometry is valid
+        console.warn(`No intersection found at (${x}, ${z}). Ground position:`, ground.position, 'Ground rotation:', ground.rotation);
+        console.warn('Ground geometry:', ground.geometry);
+        // Fallback: calculate height using the same formula as modifyTerrainHeights
+        // This is a workaround if raycaster fails
+        const calculatedHeight = Math.sin(x * 0.05) * Math.cos(-z * 0.05) * 5;
+        console.warn(`Using calculated height fallback: ${calculatedHeight}`);
+        return calculatedHeight;
     }
 }
 
@@ -369,10 +382,32 @@ function createMoon(){
     scene.add(moon);
 }
 
+function createCottage(){
+    const cottageGroup = new THREE.Group();
+    createCottageBase(cottageGroup);
+    scene.add(cottageGroup);
+}
+
+function createCottageBase(cottageGroup){
+    const cottageBaseGeometry = new THREE.BoxGeometry(10, 10, 10);
+    const cottageBaseMaterial = new THREE.MeshStandardMaterial({ color: 0x8B5A2B }); // brown
+    const cottageBase = new THREE.Mesh(cottageBaseGeometry, cottageBaseMaterial);
+    
+    // Get ground height at this position
+    const groundHeight = getHeightAt(25, 10);
+    console.log('Ground height at 25, 10:', groundHeight);
+    // BoxGeometry positions by center, so add half the height to place bottom on ground
+    const boxHeight = 10; // Height of the box
+    cottageBase.position.set(25, groundHeight + boxHeight / 2, 10);
+    
+    cottageGroup.add(cottageBase);
+}
+
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
     createMoon();
+    createCottage();
     await generateClouds();
     await generateElfAtOrigin();
     initKeyboardListeners(); // Initialize keyboard listeners
