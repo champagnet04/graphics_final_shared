@@ -531,6 +531,24 @@ function addLightsToTopFence(size, center){
     return points;
 }
 
+function addLightsToRoofBackEdge(size, center){
+    const points = [];
+    const spacing = 0.3; // Spacing between lights
+    
+    // Calculate cottage dimensions in world space
+    const width = size.x;
+    const height = size.y;
+    const depth = size.z;
+    
+    const baseY = center.y / 2;
+
+    //Front edge
+    const backZ = center.z - depth / 2;
+    addEdgeLights((center.x - width / 2) + 1.25, (center.x + width / 2) - 1.25, 'x', null, backZ + 5.15, baseY + 3.75, spacing, points);
+
+    return points;
+}
+
 function addLightsToRoofEdges(size, center){
     const points = [];
     const spacing = 0.3; // Spacing between lights
@@ -622,9 +640,10 @@ function addChristmasLightsToCottage(){
     const points = addLightsToFence(size, center);
     const topPoints = addLightsToTopFence(size, center);
     const roofPoints = addLightsToRoofEdges(size, center);
+    const roofBackPoints = addLightsToRoofBackEdge(size, center);
     
     // Combine all points into a single array
-    const allPoints = [...points, ...topPoints, ...roofPoints];
+    const allPoints = [...points, ...topPoints, ...roofPoints, ...roofBackPoints];
     const colors = new Float32Array(allPoints.length * 3);
     
     // Assign Christmas light colors in sequence
