@@ -13,6 +13,12 @@ let ground = null;
 let pond = null;
 let elf = null;
 export let northernLights = null;
+let snowmanGroup = null;
+const snowMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    side: THREE.DoubleSide,
+    map: loadSnowTexture()
+});
 
 //global ground bounds
 const groundBounds = {
@@ -115,20 +121,7 @@ function createGround(){
     // Modify the terrain to create smooth hills
     modifyTerrainHeights(groundGeometry);
 
-    const snowTexture = loadSnowTexture();
-    const groundMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0xffffff, // Base color (will be multiplied with texture)
-        side: THREE.DoubleSide, // Make it visible from both sides
-        map: snowTexture // Diffuse texture map
-    });
-    
-    // Update material when texture loads (in case it loads asynchronously)
-    snowTexture.addEventListener('load', () => {
-        groundMaterial.needsUpdate = true;
-        console.log('Snow texture loaded successfully');
-    });
-
-    ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground = new THREE.Mesh(groundGeometry, snowMaterial);
     ground.rotation.x = -Math.PI / 2; // Rotate plane to be horizontal
     ground.position.y = 0; // Position at ground level
     ground.castShadow = true;
@@ -1034,6 +1027,42 @@ function loadIceTexture(){
     return iceTexture;
 }
 
+function createSnowmanBottom() {
+    const snowmanGeometry = new THREE.SphereGeometry(2, 32, 32);
+    const snowmanBottom = new THREE.Mesh(snowmanGeometry, snowMaterial);
+    snowmanBottom.position.x = 34;
+    snowmanBottom.position.y = 1;
+    snowmanBottom.position.z = 30;
+    return snowmanBottom;
+}
+
+function createSnowmanMiddle(){
+    const snowmanGeometry = new THREE.SphereGeometry(1.5, 32, 32);
+    const snowmanMiddle = new THREE.Mesh(snowmanGeometry, snowMaterial);
+    snowmanMiddle.position.x = 34;
+    snowmanMiddle.position.y = 3;
+    snowmanMiddle.position.z = 30;
+    return snowmanMiddle;
+}
+
+function createSnowmanTop(){
+    const snowmanGeometry = new THREE.SphereGeometry(1, 32, 32);
+    const snowmanTop = new THREE.Mesh(snowmanGeometry, snowMaterial);
+    snowmanTop.position.x = 34;
+    snowmanTop.position.y = 5;
+    snowmanTop.position.z = 30;
+    return snowmanTop;
+}
+
+function createSnowman() {
+    snowmanGroup = new THREE.Group();
+    snowmanGroup.add(createSnowmanBottom());
+    snowmanGroup.add(createSnowmanMiddle());
+    snowmanGroup.add(createSnowmanTop());
+    scene.add(snowmanGroup);
+    return snowmanGroup;
+}
+
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
@@ -1044,6 +1073,7 @@ export async function setupOutdoorScene(){
     addChristmasLightsToCottage();
     generateSnow();
     createIcyPond();
+    createSnowman();
     initKeyboardListeners(); // Initialize keyboard listeners
     createNorthernLights();
     return { scene, camera };
