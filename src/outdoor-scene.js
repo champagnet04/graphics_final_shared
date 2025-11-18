@@ -12,6 +12,7 @@ const camera = setupCamera();
 let ground = null;
 let pond = null;
 let elf = null;
+export let northernLights = null;
 
 //global ground bounds
 const groundBounds = {
@@ -907,6 +908,103 @@ function createIcyPond(){
     pond = circle; // Store reference for height calculations
 }
 
+function createNorthernLights() {
+    // Create a wide, curved geometry for the aurora
+    const width = 3000;  // Very wide to span the horizon
+    const height = 1000;  // Height of the aurora curtain
+    const geometry = new THREE.PlaneGeometry(width, height, 64, 32);
+    
+    // Curve the geometry to follow the sky dome
+    const positions = geometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i];
+        const y = positions[i + 1];
+        
+        // Curve it backward (away from viewer)
+        const curveFactor = 0.0003;
+        positions[i + 2] = -Math.abs(x) * curveFactor * 100;
+        
+        // Also curve it upward slightly
+        positions[i + 1] = y + Math.abs(x) * 0.05;
+    }
+    
+    geometry.computeVertexNormals();
+    
+    // STEP 2: Create the Shader Material
+    // This is where the magic happens - animating colors
+    
+    const material = new THREE.ShaderMaterial({
+        uniforms: {
+            time: { value: 0.0 },
+            color1: { value: new THREE.Color(0x00ff88) }, // Green
+            color2: { value: new THREE.Color(0x0088ff) }, // Blue
+            color3: { value: new THREE.Color(0x8800ff) }, // Purple
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            
+            void main() {
+                vUv = uv;
+                vPosition = position;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform float time;
+            uniform vec3 color1;
+            uniform vec3 color2;
+            uniform vec3 color3;
+            
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            
+            // Noise function for organic movement
+            float noise(vec2 p) {
+                return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+            }
+            
+            void main() {
+                // Create flowing waves
+                float wave1 = sin(vUv.x * 3.0 + time * 0.5) * 0.5 + 0.5;
+                float wave2 = sin(vUv.x * 5.0 - time * 0.3) * 0.5 + 0.5;
+                float wave3 = sin(vUv.x * 7.0 + time * 0.7) * 0.5 + 0.5;
+                
+                // Combine waves for complex pattern
+                float pattern = wave1 * 0.5 + wave2 * 0.3 + wave3 * 0.2;
+                
+                // Fade out at edges (top and bottom)
+                float verticalFade = smoothstep(0.0, 0.3, vUv.y) * smoothstep(1.0, 0.7, vUv.y);
+                
+                // Fade out at horizontal edges
+                float horizontalFade = smoothstep(0.0, 0.2, vUv.x) * smoothstep(1.0, 0.8, vUv.x);
+                
+                // Mix colors based on pattern
+                vec3 finalColor = mix(color1, color2, pattern);
+                finalColor = mix(finalColor, color3, wave3);
+                
+                // Calculate opacity with fading
+                float opacity = pattern * verticalFade * horizontalFade * 0.6;
+                
+                gl_FragColor = vec4(finalColor, opacity);
+            }
+        `,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending // Makes it glow!
+    });
+    
+    const aurora = new THREE.Mesh(geometry, material);
+    
+    // STEP 3: Position the aurora in the sky
+    aurora.position.set(0, 600, -1000); // Far back, high up
+    aurora.rotation.x = Math.PI / 6; // Tilt downward slightly
+    
+    northernLights = aurora;
+    scene.add(northernLights);
+}
+
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
@@ -918,6 +1016,7 @@ export async function setupOutdoorScene(){
     generateSnow();
     createIcyPond();
     initKeyboardListeners(); // Initialize keyboard listeners
+    createNorthernLights();
     return { scene, camera };
 }
 

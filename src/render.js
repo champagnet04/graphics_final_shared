@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { setupOutdoorScene } from './outdoor-scene.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-import { moveElf, updateSnow } from './outdoor-scene.js';
+import { moveElf, updateSnow, northernLights } from './outdoor-scene.js';
 
 // Initialize the scene asynchronously
 async function init() {
@@ -40,6 +40,9 @@ async function init() {
         controls.update(); // Update controls
         moveElf();
         updateSnow(); // Update snow particles
+        if (northernLights) {
+            northernLights.material.uniforms.time.value += 0.01;
+        }
         renderer.render(scene, camera);
     }
 
