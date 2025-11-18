@@ -1052,11 +1052,124 @@ function createSnowmanTop(){
     return snowmanTop;
 }
 
+function createSnowmanHat(){
+    const snowmanHat = new THREE.Group();
+    snowmanHat.add(createSnowmanHatBottom());
+    snowmanHat.add(createSnowmanHatTop());
+    snowmanHat.position.set(0, 0, 0);
+    return snowmanHat;
+}
+
+function createSnowmanHatBottom(){
+    const hatGeometry = new THREE.CylinderGeometry(1, 1, 0.2, 32);
+    const hatMaterial = new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        side: THREE.DoubleSide
+    });
+    const snowmanHatBottom = new THREE.Mesh(hatGeometry, hatMaterial);
+    snowmanHatBottom.position.set(0, 6, 0);
+    return snowmanHatBottom;
+}
+
+function createSnowmanHatTop(){
+    const hatGeometry = new THREE.CylinderGeometry(0.75, 0.75, 1, 32);
+    const hatMaterial = new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        side: THREE.DoubleSide
+    });
+    const snowmanHatTop = new THREE.Mesh(hatGeometry, hatMaterial);
+    snowmanHatTop.position.set(0, 6.5, 0);
+    return snowmanHatTop;
+}
+
+function createCoalPiece(){
+    const coalGeometry = new THREE.SphereGeometry(0.1, 32, 32);
+    const coalMaterial = new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        side: THREE.DoubleSide
+    });
+    const coalPiece = new THREE.Mesh(coalGeometry, coalMaterial);
+    return coalPiece;
+}
+
+function createSnowmanEyes(){
+    const eyesGroup = new THREE.Group();
+    const snowmanEye1 = createCoalPiece();
+    const snowmanEye2 = createCoalPiece();
+    snowmanEye1.position.set(0.5, 5.25, 0.8);
+    snowmanEye2.position.set(-0.5, 5.25, 0.8);
+    eyesGroup.add(snowmanEye1);
+    eyesGroup.add(snowmanEye2);
+    return eyesGroup;
+}
+
+function createSnowmanNose(){
+    const noseGeometry = new THREE.ConeGeometry(0.15, 0.5, 32);
+    const noseMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffa500,
+        side: THREE.DoubleSide
+    });
+    const snowmanNose = new THREE.Mesh(noseGeometry, noseMaterial);
+    snowmanNose.position.set(0, 5, 1.25);
+    snowmanNose.rotation.x = Math.PI / 2;
+    return snowmanNose;
+}
+
+function createSnowmanSmile(){
+    const smileGroup = new THREE.Group();
+    const piece1 = createCoalPiece();
+    const piece2 = createCoalPiece();
+    const piece3 = createCoalPiece();
+    const piece4 = createCoalPiece();
+    const piece5 = createCoalPiece();
+    piece1.position.set(0.5, 4.75, 0.8);
+    piece2.position.set(-0.5, 4.75, 0.8);
+    piece3.position.set(0, 4.5, 0.85);
+    piece4.position.set(0.3, 4.57, 0.85);
+    piece5.position.set(-0.3, 4.57, 0.85);
+    
+    smileGroup.add(piece1);
+    smileGroup.add(piece2);
+    smileGroup.add(piece3);
+    smileGroup.add(piece4);
+    smileGroup.add(piece5);
+    
+    return smileGroup;
+}
+
+function createSnowmanFace(){
+    const faceGroup = new THREE.Group();
+    faceGroup.add(createSnowmanEyes());
+    faceGroup.add(createSnowmanNose());
+    faceGroup.add(createSnowmanSmile());
+    return faceGroup;
+}
+
+function createSnowmanButtons(){
+    const buttonsGroup = new THREE.Group();
+    const button1 = createCoalPiece();
+    const button2 = createCoalPiece();
+    const button3 = createCoalPiece();
+    button1.scale.set(1.5, 1.5, 1.5);
+    button2.scale.set(1.5, 1.5, 1.5);
+    button3.scale.set(1.5, 1.5, 1.5);
+    button1.position.set(0, 3.85, 1.25);
+    button2.position.set(0, 3, 1.5);
+    button3.position.set(0, 1.75, 1.85);
+    buttonsGroup.add(button1);
+    buttonsGroup.add(button2);
+    buttonsGroup.add(button3);
+    return buttonsGroup;
+}
+
 function createSnowman(x, z) {
     snowmanGroup = new THREE.Group();
     snowmanGroup.add(createSnowmanBottom());
     snowmanGroup.add(createSnowmanMiddle());
     snowmanGroup.add(createSnowmanTop());
+    snowmanGroup.add(createSnowmanHat());
+    snowmanGroup.add(createSnowmanFace());
+    snowmanGroup.add(createSnowmanButtons());
     snowmanGroup.position.set(x, getHeightAt(x, z), z);
     scene.add(snowmanGroup);
     //sceneObjects.push({ x, z });
@@ -1256,7 +1369,7 @@ export async function setupOutdoorScene(){
     generateSnow();
     createIcyPond();
     generateSnowmen();
-    generateTestBoxes();
+    //generateTestBoxes();
     initKeyboardListeners();
     createNorthernLights();
     return { scene, camera };

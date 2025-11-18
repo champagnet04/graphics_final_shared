@@ -22,10 +22,31 @@ async function init() {
 
     // Initialize OrbitControls after renderer is created
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.minDistance = 1; // Minimum zoom distance
-    controls.maxDistance = 1000; // Maximum zoom distance
+    
+    // Zoom settings
+    controls.minDistance = 5; // Minimum zoom distance
+    controls.maxDistance = 500; // Maximum zoom distance
+    controls.zoomSpeed = 1.2; // Faster zoom
+    
+    // Rotation settings
+    controls.rotateSpeed = 0.8; // Slower, more controlled rotation
+    controls.enableRotate = true;
+    
+    // Pan settings
+    controls.panSpeed = 1.0; // Pan speed
+    controls.screenSpacePanning = true; // Pan parallel to screen instead of ground
+    
+    // Vertical rotation limits (prevent flipping)
+    controls.minPolarAngle = 0; // Can look straight up
+    controls.maxPolarAngle = Math.PI; // Can look straight down
+    
+    // Smooth camera movement
     controls.enableDamping = true; // Smooth camera movement
-    controls.dampingFactor = 0.05;
+    controls.dampingFactor = 0.1; // Higher damping for smoother feel
+    
+    // Set initial target to scene center
+    controls.target.set(0, 0, 0);
+    controls.update();
 
     // Update camera aspect ratio when window resizes
     window.addEventListener('resize', () => {
