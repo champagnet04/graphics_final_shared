@@ -891,7 +891,8 @@ function createIceMaterial() {
         thickness: 0.5,
         clearcoat: 1.0,       // Adds glossy layer
         clearcoatRoughness: 0.3,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
+        map: loadIceTexture()
     });
 }
 
@@ -1003,6 +1004,34 @@ function createNorthernLights() {
     
     northernLights = aurora;
     scene.add(northernLights);
+}
+
+function loadIceTexture(){
+    const loader = new THREE.TextureLoader();
+    const iceTexture = loader.load(
+        '/textures/ice.png',
+        // onLoad callback
+        (texture) => {
+            // Configure texture wrapping and repeat for tiling
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            // Repeat the texture across the ground (adjust these values to control tile size)
+            texture.repeat.set(10, 10); // Repeat 10 times in each direction
+        },
+        // onProgress callback (optional)
+        undefined,
+        // onError callback
+        (error) => {
+            console.error('Error loading ice texture:', error);
+        }
+    );
+    
+    // Set wrapping and repeat immediately (in case texture loads synchronously)
+    // iceTexture.wrapS = THREE.RepeatWrapping;
+    // iceTexture.wrapT = THREE.RepeatWrapping;
+    // iceTexture.repeat.set(10, 10);
+    
+    return iceTexture;
 }
 
 export async function setupOutdoorScene(){    
