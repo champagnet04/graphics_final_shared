@@ -31,6 +31,17 @@ const groundBounds = {
     yMax: 100
 };
 
+const lightColors = [
+    0xff0000, // Red
+    0xffff00, // Yellow
+    0x00ff00, // Green
+    0x00ffff, // Cyan
+    0x0000ff, // Blue
+    0xff00ff, // Magenta / Pink
+    0xffffff, // White
+    0xffa500  // Orange/gold (for warmth)
+];
+
 // Track keyboard state
 const keysPressed = {};
 
@@ -495,18 +506,6 @@ function getCottageGroup(){
     return cottageGroup;
 }
 
-function setChristmasLightColors() {
-    const lightColors = [
-        0xff0000, // Red
-        0x00ff00, // Green
-        0xffff00, // Yellow
-        0x0000ff, // Blue
-        0xff00ff, // Magenta
-        0x00ffff, // Cyan
-    ];
-    return lightColors;
-}
-
 /**
  * Helper function to add lights in a sequence along an axis
  * @param {number} start - Starting position along the axis
@@ -732,9 +731,6 @@ function addChristmasLightsToCottage(){
     // The bounding box center is in world space, but since the cottage group
     // is at the origin (0,0,0), world space coordinates = group local space coordinates
     // So we can use the center directly for positioning lights in the group
-    
-    // Christmas light colors (traditional colors)
-    const lightColors = setChristmasLightColors();
     
     const points = addLightsToFence(size, center);
     const topPoints = addLightsToTopFence(size, center);
@@ -1317,6 +1313,67 @@ async function loadTreeStar(){
     }
 }
 
+function createTreeLights(){
+    const lightsGroup = new THREE.Group();
+
+    // Parameters for the tree segment locations in Y, approximate radii, and lights per ring
+    const segments = [
+        { y: 2, r: 3.25, lightsPerRing: 12 },      // bottom third (just above trunk) - most lights
+        { y: 4.25, r: 2.35, lightsPerRing: 8 },     // middle triangle - fewer lights
+        { y: 6.5, r: 1.25, lightsPerRing: 4 }   // top triangle just under star - even fewer lights
+    ];
+
+    // Helper function to create a ring of lights
+    function createRing(centerY, radius, angleOffset, lightsPerRing) {
+        const ringLights = [];
+        const angleStep = (2 * Math.PI) / lightsPerRing;
+        
+        for (let i = 0; i < lightsPerRing; i++) {
+            const angle = i * angleStep + angleOffset;
+            const x = radius * Math.cos(angle);
+            const z = radius * Math.sin(angle);
+            
+            // Choose random color for each light
+            const color = lightColors[Math.floor(Math.random() * lightColors.length)];
+            
+            const spriteMaterial = new THREE.SpriteMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.9,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.position.set(x, centerY, z);
+            sprite.scale.set(0.2, 0.2, 1);
+            
+            ringLights.push(sprite);
+        }
+        return ringLights;
+    }
+
+    // Create two rings for each segment (staggered for zigzag pattern)
+    for (let s = 0; s < segments.length; s++) {
+        const seg = segments[s];
+        // Stagger offset for zigzag pattern (half the angle between lights)
+        const staggerOffset = Math.PI / seg.lightsPerRing;
+        
+        // Bottom ring: larger radius, positioned lower
+        const bottomRingRadius = seg.r * 0.85;
+        const bottomRingY = seg.y - 0.3;
+        const bottomRingLights = createRing(bottomRingY, bottomRingRadius, 0, seg.lightsPerRing);
+        bottomRingLights.forEach(light => lightsGroup.add(light));
+        
+        // Top ring: smaller radius, positioned higher, staggered for zigzag
+        const topRingRadius = seg.r * 0.65;
+        const topRingY = seg.y + 0.3;
+        const topRingLights = createRing(topRingY, topRingRadius, staggerOffset, seg.lightsPerRing);
+        topRingLights.forEach(light => lightsGroup.add(light));
+    }
+
+    return lightsGroup;
+}
+
 async function createTree(x, z){
     const treeGroup = new THREE.Group();
     treeGroup.add(createTreeTrunk());
@@ -1324,6 +1381,7 @@ async function createTree(x, z){
     treeGroup.add(createTreeMiddle());
     treeGroup.add(createTreeTop());
     treeGroup.add(createTreeSnow());
+    treeGroup.add(createTreeLights());
     
     const star = await loadTreeStar();
     if (star) {
