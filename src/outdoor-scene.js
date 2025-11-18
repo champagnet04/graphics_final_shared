@@ -19,6 +19,7 @@ const snowMaterial = new THREE.MeshStandardMaterial({
     side: THREE.DoubleSide,
     map: loadSnowTexture()
 });
+let sceneObjects = [];
 
 //global ground bounds
 const groundBounds = {
@@ -1030,37 +1031,218 @@ function loadIceTexture(){
 function createSnowmanBottom() {
     const snowmanGeometry = new THREE.SphereGeometry(2, 32, 32);
     const snowmanBottom = new THREE.Mesh(snowmanGeometry, snowMaterial);
-    snowmanBottom.position.x = 34;
-    snowmanBottom.position.y = 1;
-    snowmanBottom.position.z = 30;
+    // Position relative to group (group will be at ground level)
+    snowmanBottom.position.set(0, 1, 0); // 1 unit above group base
     return snowmanBottom;
 }
 
 function createSnowmanMiddle(){
     const snowmanGeometry = new THREE.SphereGeometry(1.5, 32, 32);
     const snowmanMiddle = new THREE.Mesh(snowmanGeometry, snowMaterial);
-    snowmanMiddle.position.x = 34;
-    snowmanMiddle.position.y = 3;
-    snowmanMiddle.position.z = 30;
+    // Position relative to group
+    snowmanMiddle.position.set(0, 3, 0); // 3 units above group base
     return snowmanMiddle;
 }
 
 function createSnowmanTop(){
     const snowmanGeometry = new THREE.SphereGeometry(1, 32, 32);
     const snowmanTop = new THREE.Mesh(snowmanGeometry, snowMaterial);
-    snowmanTop.position.x = 34;
-    snowmanTop.position.y = 5;
-    snowmanTop.position.z = 30;
+    // Position relative to group
+    snowmanTop.position.set(0, 5, 0); // 5 units above group base
     return snowmanTop;
 }
 
-function createSnowman() {
+function createSnowman(x, z) {
     snowmanGroup = new THREE.Group();
     snowmanGroup.add(createSnowmanBottom());
     snowmanGroup.add(createSnowmanMiddle());
     snowmanGroup.add(createSnowmanTop());
+    snowmanGroup.position.set(x, getHeightAt(x, z), z);
     scene.add(snowmanGroup);
+    //sceneObjects.push({ x, z });
     return snowmanGroup;
+}
+
+/**
+ * Checks if a position is valid for placing objects (snowmen, trees, etc.)
+ * @param {number} x - X coordinate to check
+ * @param {number} z - Z coordinate to check
+ * @param {Array<{x: number, z: number, minSpacing: number}>} existingObjects - Array of existing objects with their positions and minimum spacing requirements
+ * @param {number} minDistanceFromStructures - Minimum distance from pond/cottage
+ * @param {number} newObjectSpacing - Spacing requirement for the new object being placed
+ * @param {Array<{x: number, z: number, minSpacing: number}>} excludePositions - Optional array of specific positions to exclude (e.g., manually placed objects)
+ * @returns {boolean} True if the position is valid, false otherwise
+ */
+function isValidPosition(x, z, existingObjects = [], minDistanceFromStructures = 6, newObjectSpacing = 0, excludePositions = []) {
+    // Constants for structure positions
+    const COTTAGE_CENTER = { x: 25, z: 10 };
+    const COTTAGE_EXCLUSION_RADIUS = 12; // About the size of the cottage group
+    const POND_CENTER = { x: -30, z: 0 }; // Match actual pond position from createIcyPond()
+    const POND_RADIUS = 25;
+    
+    // Check distance from pond
+    const pondDist = Math.sqrt(Math.pow(x - POND_CENTER.x, 2) + Math.pow(z - POND_CENTER.z, 2));
+    if (pondDist < POND_RADIUS + minDistanceFromStructures) {
+        return false;
+    }
+    
+    // Check distance from cottage
+    const cottageDist = Math.sqrt(Math.pow(x - COTTAGE_CENTER.x, 2) + Math.pow(z - COTTAGE_CENTER.z, 2));
+    if (cottageDist < COTTAGE_EXCLUSION_RADIUS + minDistanceFromStructures) {
+        return false;
+    }
+    
+    // Check distance from exclude positions (e.g., manually placed objects)
+    for (const excludePos of excludePositions) {
+        const dist = Math.sqrt(Math.pow(x - excludePos.x, 2) + Math.pow(z - excludePos.z, 2));
+        // Use maximum of new object spacing and exclude position spacing
+        const requiredSpacing = Math.max(newObjectSpacing, excludePos.minSpacing);
+        if (dist < requiredSpacing) {
+            return false;
+        }
+    }
+    
+    // Check distance from all existing objects
+    // Use the maximum of the new object's spacing and each existing object's spacing
+    for (const existingObj of existingObjects) {
+        const dist = Math.sqrt(Math.pow(x - existingObj.x, 2) + Math.pow(z - existingObj.z, 2));
+        const requiredSpacing = Math.max(newObjectSpacing, existingObj.minSpacing);
+        if (dist < requiredSpacing) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+/**
+ * Generates items evenly distributed across the scene using a grid-based approach
+ * @param {number} count - Number of items to generate
+ * @param {number} spacing - Minimum distance between items of this type
+ * @param {number} minDistanceFromStructures - Minimum distance from pond/cottage
+ * @param {function} createFunction - Function that creates the item, takes (x, z) as parameters
+ * @param {Array<{x: number, z: number, minSpacing: number}>} existingObjects - Optional array of existing objects to avoid (e.g., other item types)
+ * @param {number} edgeClearance - Clearance from ground edges (default: 5)
+ * @param {number} maxTriesPerCell - Maximum attempts to place an item in each cell (default: 20)
+ * @returns {Array<{x: number, z: number}>} Array of placed item positions
+ */
+function generateItem(count, spacing, minDistanceFromStructures, createFunction, existingObjects = [], edgeClearance = 5, maxTriesPerCell = 20) {
+    // Calculate available area (excluding edge clearance)
+    const availableWidth = (groundBounds.xMax - groundBounds.xMin) - (edgeClearance * 2);
+    const availableDepth = (groundBounds.zMax - groundBounds.zMin) - (edgeClearance * 2);
+    
+    // Calculate grid dimensions for even distribution
+    // Try to create a roughly square grid
+    const gridCols = Math.ceil(Math.sqrt(count * (availableWidth / availableDepth)));
+    const gridRows = Math.ceil(count / gridCols);
+    
+    const cellWidth = availableWidth / gridCols;
+    const cellDepth = availableDepth / gridRows;
+    
+    // Track positions of placed items
+    const placedItems = [];
+    let itemIndex = 0;
+
+    // Iterate through grid cells and place items
+    for (let row = 0; row < gridRows && itemIndex < count; row++) {
+        for (let col = 0; col < gridCols && itemIndex < count; col++) {
+            // Calculate the center of this grid cell
+            const cellCenterX = groundBounds.xMin + edgeClearance + (col + 0.5) * cellWidth;
+            const cellCenterZ = groundBounds.zMin + edgeClearance + (row + 0.5) * cellDepth;
+            
+            // Try to place an item in this cell with some jitter
+            const maxJitter = Math.min(cellWidth, cellDepth) * 0.3; // 30% of cell size
+            let tries = 0;
+            let placed = false;
+            
+            while (tries < maxTriesPerCell && !placed) {
+                // Add random jitter within the cell
+                const jitterX = (Math.random() - 0.5) * maxJitter;
+                const jitterZ = (Math.random() - 0.5) * maxJitter;
+                const x = cellCenterX + jitterX;
+                const z = cellCenterZ + jitterZ;
+                
+                // Make sure we're still within bounds
+                if (x < groundBounds.xMin + edgeClearance || x > groundBounds.xMax - edgeClearance ||
+                    z < groundBounds.zMin + edgeClearance || z > groundBounds.zMax - edgeClearance) {
+                    tries++;
+                    continue;
+                }
+                
+                // Combine existing objects with already placed items of this type
+                const allExistingObjects = [
+                    ...existingObjects,
+                    ...placedItems.map(pos => ({ x: pos.x, z: pos.z, minSpacing: spacing }))
+                ];
+                
+                // Check if position is valid
+                // Pass spacing as newObjectSpacing to ensure proper spacing between different object types
+                if (isValidPosition(x, z, allExistingObjects, minDistanceFromStructures, spacing)) {
+                    createFunction(x, z);
+                    placedItems.push({ x, z });
+                    placed = true;
+                    itemIndex++;
+                } else {
+                    tries++;
+                }
+            }
+        }
+    }
+    
+    return placedItems;
+}
+
+function generateSnowmen(){
+    const SNOWMAN_COUNT = 7;
+    const SNOWMAN_MIN_DIST = 6; // Minimum distance from cottage center and pond/cottage edge
+    const SNOWMAN_SPACING = 8; // Minimum distance between snowmen
+    
+    // Generate snowmen using the general function
+    const placedSnowmen = generateItem(
+        SNOWMAN_COUNT,
+        SNOWMAN_SPACING,
+        SNOWMAN_MIN_DIST,
+        createSnowman,
+        sceneObjects // Pass existing scene objects to avoid
+    );
+    
+    // Add snowmen positions to sceneObjects so other items can avoid them
+    for (const pos of placedSnowmen) {
+        sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: SNOWMAN_SPACING });
+    }
+}
+
+function createTestBox(x, z){
+    const box = new THREE.BoxGeometry(2, 2, 2);
+    const boxMaterial = new THREE.MeshStandardMaterial({
+        color: 0x00ff00,
+        side: THREE.DoubleSide,
+    });
+    const boxMesh = new THREE.Mesh(box, boxMaterial);
+    boxMesh.position.set(x, getHeightAt(x, z), z);
+    scene.add(boxMesh);
+    //sceneObjects.push({ x, z });
+    return boxMesh;
+}
+
+function generateTestBoxes(){
+    const BOX_COUNT = 20;
+    const BOX_SPACING = 10;
+    const BOX_MIN_DIST = 6;
+    
+    // Generate boxes using the general function (will avoid snowmen via sceneObjects)
+    const placedBoxes = generateItem(
+        BOX_COUNT,
+        BOX_SPACING,
+        BOX_MIN_DIST,
+        createTestBox,
+        sceneObjects // Pass existing scene objects (snowmen) to avoid
+    );
+    
+    // Add box positions to sceneObjects so other items can avoid them
+    for (const pos of placedBoxes) {
+        sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: BOX_SPACING });
+    }
 }
 
 export async function setupOutdoorScene(){    
@@ -1073,8 +1255,9 @@ export async function setupOutdoorScene(){
     addChristmasLightsToCottage();
     generateSnow();
     createIcyPond();
-    createSnowman();
-    initKeyboardListeners(); // Initialize keyboard listeners
+    generateSnowmen();
+    generateTestBoxes();
+    initKeyboardListeners();
     createNorthernLights();
     return { scene, camera };
 }
