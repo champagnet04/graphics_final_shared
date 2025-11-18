@@ -1033,6 +1033,8 @@ function createSnowmanBottom() {
     const snowmanBottom = new THREE.Mesh(snowmanGeometry, snowMaterial);
     // Position relative to group (group will be at ground level)
     snowmanBottom.position.set(0, 1, 0); // 1 unit above group base
+    snowmanBottom.castShadow = true;
+    snowmanBottom.receiveShadow = true;
     return snowmanBottom;
 }
 
@@ -1041,6 +1043,8 @@ function createSnowmanMiddle(){
     const snowmanMiddle = new THREE.Mesh(snowmanGeometry, snowMaterial);
     // Position relative to group
     snowmanMiddle.position.set(0, 3, 0); // 3 units above group base
+    snowmanMiddle.castShadow = true;
+    snowmanMiddle.receiveShadow = true;
     return snowmanMiddle;
 }
 
@@ -1049,6 +1053,8 @@ function createSnowmanTop(){
     const snowmanTop = new THREE.Mesh(snowmanGeometry, snowMaterial);
     // Position relative to group
     snowmanTop.position.set(0, 5, 0); // 5 units above group base
+    snowmanTop.castShadow = true;
+    snowmanTop.receiveShadow = true;
     return snowmanTop;
 }
 
@@ -1057,6 +1063,8 @@ function createSnowmanHat(){
     snowmanHat.add(createSnowmanHatBottom());
     snowmanHat.add(createSnowmanHatTop());
     snowmanHat.position.set(0, 0, 0);
+    snowmanHat.castShadow = true;
+    snowmanHat.receiveShadow = true;
     return snowmanHat;
 }
 
@@ -1068,6 +1076,8 @@ function createSnowmanHatBottom(){
     });
     const snowmanHatBottom = new THREE.Mesh(hatGeometry, hatMaterial);
     snowmanHatBottom.position.set(0, 6, 0);
+    snowmanHatBottom.castShadow = true;
+    snowmanHatBottom.receiveShadow = true;
     return snowmanHatBottom;
 }
 
@@ -1079,6 +1089,8 @@ function createSnowmanHatTop(){
     });
     const snowmanHatTop = new THREE.Mesh(hatGeometry, hatMaterial);
     snowmanHatTop.position.set(0, 6.5, 0);
+    snowmanHatTop.castShadow = true;
+    snowmanHatTop.receiveShadow = true;
     return snowmanHatTop;
 }
 
@@ -1089,6 +1101,8 @@ function createCoalPiece(){
         side: THREE.DoubleSide
     });
     const coalPiece = new THREE.Mesh(coalGeometry, coalMaterial);
+    coalPiece.castShadow = true;
+    coalPiece.receiveShadow = true;
     return coalPiece;
 }
 
@@ -1176,6 +1190,151 @@ function createSnowman(x, z) {
     return snowmanGroup;
 }
 
+function createTreeTrunk(){
+    const trunkGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
+    const trunkMaterial = new THREE.MeshStandardMaterial({
+        color: 0x654321, // a deeper brown
+        side: THREE.DoubleSide
+    });
+    const trunkMesh = new THREE.Mesh(trunkGeometry, trunkMaterial);
+    trunkMesh.position.set(0, 0.5, 0);
+    trunkMesh.castShadow = true;
+    trunkMesh.receiveShadow = true;
+    return trunkMesh;
+}
+
+function createTreeBottom(){
+    const bottomGeom = new THREE.CylinderGeometry(1.5, 3, 2.25, 32);
+    const bottomMaterial = new THREE.MeshStandardMaterial({
+        color: 0x023020, // dark green
+        side: THREE.DoubleSide
+    });
+    const bottomMesh = new THREE.Mesh(bottomGeom, bottomMaterial);
+    bottomMesh.position.set(0, 2, 0);
+    bottomMesh.castShadow = true;
+    bottomMesh.receiveShadow = true;
+    return bottomMesh;
+}
+
+function createTreeMiddle(){
+    const middleGeom = new THREE.CylinderGeometry(1, 2.25, 2.25, 32);
+    const middleMaterial = new THREE.MeshStandardMaterial({
+        color: 0x023020, // dark green
+        side: THREE.DoubleSide
+    });
+    const middleMesh = new THREE.Mesh(middleGeom, middleMaterial);
+    middleMesh.position.set(0, 4.25, 0);
+    middleMesh.castShadow = true;
+    middleMesh.receiveShadow = true;
+    return middleMesh;
+}
+
+function createTreeTop(){
+    const topGeom = new THREE.ConeGeometry(1.5, 2.25, 32);
+    const topMaterial = new THREE.MeshStandardMaterial({
+        color: 0x023020, // dark green
+        side: THREE.DoubleSide
+    });
+    const topMesh = new THREE.Mesh(topGeom, topMaterial);
+    topMesh.position.set(0, 6.5, 0);
+    topMesh.castShadow = true;
+    topMesh.receiveShadow = true;
+    return topMesh;
+}
+
+function createBottomTreeSnow(){
+    const bottomSnowGeom = new THREE.CylinderGeometry(2.8, 3.1, 0.5, 32);
+    const bottomSnowMesh = new THREE.Mesh(bottomSnowGeom, snowMaterial);
+    bottomSnowMesh.position.set(0, 1, 0);
+    bottomSnowMesh.castShadow = true;
+    bottomSnowMesh.receiveShadow = true;
+    return bottomSnowMesh;
+}
+
+function createMiddleTreeSnow(){
+    const middleSnowGeom = new THREE.CylinderGeometry(2.1, 2.35, 0.5, 32);
+    const middleSnowMesh = new THREE.Mesh(middleSnowGeom, snowMaterial);
+    middleSnowMesh.position.set(0, 3.25, 0);
+    middleSnowMesh.castShadow = true;
+    middleSnowMesh.receiveShadow = true;
+    return middleSnowMesh;
+}
+
+function createTopTreeSnow(){
+    const topSnowGeom = new THREE.CylinderGeometry(1.45, 1.75, 0.5, 32);
+    const topSnowMesh = new THREE.Mesh(topSnowGeom, snowMaterial);
+    topSnowMesh.position.set(0, 5.25, 0);
+    topSnowMesh.castShadow = true;
+    topSnowMesh.receiveShadow = true;
+    return topSnowMesh;
+}
+
+function createTreeSnow(){
+    const snowGroup = new THREE.Group();
+    snowGroup.add(createBottomTreeSnow());
+    snowGroup.add(createMiddleTreeSnow());
+    snowGroup.add(createTopTreeSnow());
+    return snowGroup;
+}
+
+async function loadTreeStar(){
+    const loader = new GLTFLoader();
+    try {
+        const gltf = await loader.loadAsync('/models/christmas_star/scene.gltf');
+        const star = gltf.scene.clone();
+        
+        star.position.set(0, 7.95, 0.05);
+        star.castShadow = true;
+        star.receiveShadow = true;
+        star.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                // Make the star glow by adding emissive properties
+                if (child.material) {
+                    // Helper function to add emissive glow to a material
+                    const addEmissiveGlow = (material) => {
+                        if (!material) return material;
+                        const newMaterial = material.clone();
+                        newMaterial.emissive = new THREE.Color(0xffffaa); // Warm yellow-gold
+                        newMaterial.emissiveIntensity = 0.5; // How bright it glows
+                        newMaterial.needsUpdate = true;
+                        return newMaterial;
+                    };
+                    
+                    // Handle both single materials and arrays
+                    child.material = Array.isArray(child.material)
+                        ? child.material.map(addEmissiveGlow)
+                        : addEmissiveGlow(child.material);
+                }
+            }
+        });
+        
+        return star;
+    } catch (error) {
+        console.error('Cant load model:', error);
+    }
+}
+
+async function createTree(x, z){
+    const treeGroup = new THREE.Group();
+    treeGroup.add(createTreeTrunk());
+    treeGroup.add(createTreeBottom());
+    treeGroup.add(createTreeMiddle());
+    treeGroup.add(createTreeTop());
+    treeGroup.add(createTreeSnow());
+    
+    const star = await loadTreeStar();
+    if (star) {
+        treeGroup.add(star);
+    }
+    
+    treeGroup.position.set(x, getHeightAt(x, z), z);
+    scene.add(treeGroup);
+    return treeGroup;
+}
+
 /**
  * Checks if a position is valid for placing objects (snowmen, trees, etc.)
  * @param {number} x - X coordinate to check
@@ -1233,13 +1392,13 @@ function isValidPosition(x, z, existingObjects = [], minDistanceFromStructures =
  * @param {number} count - Number of items to generate
  * @param {number} spacing - Minimum distance between items of this type
  * @param {number} minDistanceFromStructures - Minimum distance from pond/cottage
- * @param {function} createFunction - Function that creates the item, takes (x, z) as parameters
+ * @param {function} createFunction - Function that creates the item, takes (x, z) as parameters (can be async)
  * @param {Array<{x: number, z: number, minSpacing: number}>} existingObjects - Optional array of existing objects to avoid (e.g., other item types)
  * @param {number} edgeClearance - Clearance from ground edges (default: 5)
  * @param {number} maxTriesPerCell - Maximum attempts to place an item in each cell (default: 20)
- * @returns {Array<{x: number, z: number}>} Array of placed item positions
+ * @returns {Promise<Array<{x: number, z: number}>>} Promise that resolves to array of placed item positions
  */
-function generateItem(count, spacing, minDistanceFromStructures, createFunction, existingObjects = [], edgeClearance = 5, maxTriesPerCell = 20) {
+async function generateItem(count, spacing, minDistanceFromStructures, createFunction, existingObjects = [], edgeClearance = 5, maxTriesPerCell = 20) {
     // Calculate available area (excluding edge clearance)
     const availableWidth = (groundBounds.xMax - groundBounds.xMin) - (edgeClearance * 2);
     const availableDepth = (groundBounds.zMax - groundBounds.zMin) - (edgeClearance * 2);
@@ -1291,7 +1450,7 @@ function generateItem(count, spacing, minDistanceFromStructures, createFunction,
                 // Check if position is valid
                 // Pass spacing as newObjectSpacing to ensure proper spacing between different object types
                 if (isValidPosition(x, z, allExistingObjects, minDistanceFromStructures, spacing)) {
-                    createFunction(x, z);
+                    await createFunction(x, z);
                     placedItems.push({ x, z });
                     placed = true;
                     itemIndex++;
@@ -1305,13 +1464,13 @@ function generateItem(count, spacing, minDistanceFromStructures, createFunction,
     return placedItems;
 }
 
-function generateSnowmen(){
+async function generateSnowmen(){
     const SNOWMAN_COUNT = 7;
     const SNOWMAN_MIN_DIST = 6; // Minimum distance from cottage center and pond/cottage edge
     const SNOWMAN_SPACING = 8; // Minimum distance between snowmen
     
     // Generate snowmen using the general function
-    const placedSnowmen = generateItem(
+    const placedSnowmen = await generateItem(
         SNOWMAN_COUNT,
         SNOWMAN_SPACING,
         SNOWMAN_MIN_DIST,
@@ -1325,36 +1484,21 @@ function generateSnowmen(){
     }
 }
 
-function createTestBox(x, z){
-    const box = new THREE.BoxGeometry(2, 2, 2);
-    const boxMaterial = new THREE.MeshStandardMaterial({
-        color: 0x00ff00,
-        side: THREE.DoubleSide,
-    });
-    const boxMesh = new THREE.Mesh(box, boxMaterial);
-    boxMesh.position.set(x, getHeightAt(x, z), z);
-    scene.add(boxMesh);
-    //sceneObjects.push({ x, z });
-    return boxMesh;
-}
-
-function generateTestBoxes(){
-    const BOX_COUNT = 20;
-    const BOX_SPACING = 10;
-    const BOX_MIN_DIST = 6;
-    
-    // Generate boxes using the general function (will avoid snowmen via sceneObjects)
-    const placedBoxes = generateItem(
-        BOX_COUNT,
-        BOX_SPACING,
-        BOX_MIN_DIST,
-        createTestBox,
-        sceneObjects // Pass existing scene objects (snowmen) to avoid
+async function generateTrees(){
+    const TREE_COUNT = 10;
+    const TREE_SPACING = 10;
+    const TREE_MIN_DIST = 6;
+    const placedTrees = await generateItem(
+        TREE_COUNT,
+        TREE_SPACING,
+        TREE_MIN_DIST,
+        createTree,
+        sceneObjects // Pass existing scene objects to avoid
     );
     
-    // Add box positions to sceneObjects so other items can avoid them
-    for (const pos of placedBoxes) {
-        sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: BOX_SPACING });
+    // Add trees positions to sceneObjects so other items can avoid them
+    for (const pos of placedTrees) {
+        sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: TREE_SPACING });
     }
 }
 
@@ -1368,8 +1512,9 @@ export async function setupOutdoorScene(){
     addChristmasLightsToCottage();
     generateSnow();
     createIcyPond();
-    generateSnowmen();
+    await generateSnowmen();
     //generateTestBoxes();
+    await generateTrees();
     initKeyboardListeners();
     createNorthernLights();
     return { scene, camera };
