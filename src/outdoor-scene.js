@@ -462,7 +462,7 @@ export function moveElf(){
         return;
     }
     
-    const moveSpeed = 0.1;
+    const moveSpeed = 0.3;
     
     const elfRotation = elf.rotation.y;
     
@@ -1723,7 +1723,6 @@ function createSnowman(x, z) {
     snowmanGroup.add(createSnowmanButtons());
     snowmanGroup.position.set(x, getHeightAt(x, z), z);
     scene.add(snowmanGroup);
-    //snowmanGroup.greeting = holidayGreetings[Math.floor(Math.random() * holidayGreetings.length)];
     return snowmanGroup;
 }
 
@@ -2782,25 +2781,18 @@ export function pickUpSnowball(){
     
     const snowball = createSnowball();
     
-    // Position relative to elf: in front and at hand height
-    const handOffset = 0.8; // Height offset for hand position
-    const forwardOffset = 0.5; // Distance in front of elf
-    const sideOffset = 0.3; // Slight offset to the right (elf's right)
+    // Position relative to elf group (local coordinates)
+    // Since the snowball is a child of the elf, it will move and rotate with the elf
+    const handOffset = 0.8; // Height offset for hand position (local Y)
+    const forwardOffset = 0.5; // Distance in front of elf (local Z)
+    const sideOffset = 3; // Slight offset to the right (local X)
     
-    // Calculate position based on elf's rotation
-    const elfRotation = elf.rotation.y;
-    const forwardX = Math.sin(elfRotation) * forwardOffset;
-    const forwardZ = Math.cos(elfRotation) * forwardOffset;
-    const rightX = Math.sin(elfRotation + Math.PI / 2) * sideOffset;
-    const rightZ = Math.cos(elfRotation + Math.PI / 2) * sideOffset;
+    // Set position in elf's local coordinate system
+    // X = right, Y = up, Z = forward
+    snowball.position.set(3, 0.8, 0.5);
     
-    // World position relative to elf
-    const worldX = elf.position.x + forwardX + rightX;
-    const worldY = elf.position.y + handOffset;
-    const worldZ = elf.position.z + forwardZ + rightZ;
-    
-    snowball.position.set(worldX, worldY, worldZ);
-    scene.add(snowball);
+    // Add snowball to elf group (not scene) so it moves with the elf
+    elf.add(snowball);
     
     return snowball;
 }

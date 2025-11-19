@@ -66,9 +66,7 @@ async function init() {
         
         const allIntersects = raycaster.intersectObjects(scene.children, true);
         
-        if (checkIfSnowballPile(allIntersects)) {
-            return;
-        }
+        checkIfSnowballPile(allIntersects);
         
         checkIfSnowman(allIntersects);
     }
