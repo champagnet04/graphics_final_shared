@@ -59,10 +59,54 @@ function setupCamera(){
         2000
     );
 
-    camera.position.set(0, 5, 10);
-    camera.lookAt(0, 0, 0);
+    // Initial 3rd person camera position (behind and above the elf at origin)
+    // Elf starts at (0, 0, 0) facing +z direction, so camera should be behind (negative z)
+    const cameraDistance = 8;
+    const cameraHeight = 5;
+    camera.position.set(0, cameraHeight, -cameraDistance);
+    camera.lookAt(0, 1, 3); // Look slightly ahead of the elf
 
     return camera;
+}
+
+export function followElf(){
+    // Follow the elf with a 3rd person camera perspective
+    if (!elf) {
+        elf = scene.children.find(child => child.name === 'elf');
+    }
+    
+    if (!elf) {
+        return;
+    }
+    
+    // Camera settings for 3rd person view
+    const cameraDistance = 8; // Distance behind the elf
+    const cameraHeight = 5; // Height above the elf
+    
+    // Get the elf's facing direction from rotation.y
+    // rotation.y = 0 means facing +z, Math.PI means facing -z, etc.
+    const facingAngle = elf.rotation.y;
+    
+    // Calculate position behind the elf (opposite to facing direction)
+    const cameraX = elf.position.x - Math.sin(facingAngle) * cameraDistance;
+    const cameraZ = elf.position.z - Math.cos(facingAngle) * cameraDistance;
+    const cameraY = elf.position.y + cameraHeight;
+    
+    // Update camera position
+    camera.position.set(cameraX, cameraY, cameraZ);
+    
+    // Look at a point slightly ahead of the elf in the direction it's facing
+    // Apply camera pitch (up/down look) to the look target
+    const lookAheadDistance = 3;
+    const lookX = elf.position.x + Math.sin(facingAngle) * lookAheadDistance;
+    const lookZ = elf.position.z + Math.cos(facingAngle) * lookAheadDistance;
+    const baseLookY = elf.position.y + 1; // Look slightly above the elf's base
+    
+    // Apply pitch offset (vertical look adjustment)
+    const pitchOffset = Math.sin(cameraPitch) * 5; // Scale the pitch effect
+    const lookY = baseLookY + pitchOffset;
+    
+    camera.lookAt(lookX, lookY, lookZ);
 }
 
 function setupLights(){
@@ -272,7 +316,60 @@ async function generateElfAtOrigin(){
     }
 }
 
+// Track camera pitch for looking up/down
+let cameraPitch = 0;
+
 export function moveElf(){
+    if (!elf) {
+        elf = scene.children.find(child => child.name === 'elf');
+    }
+    if (!elf) return;
+    
+    // Check if any arrow key is pressed
+    if (!keysPressed['arrowup'] && !keysPressed['arrowdown'] && 
+        !keysPressed['arrowleft'] && !keysPressed['arrowright']) {
+        elf.position.y = getHeightAt(elf.position.x, elf.position.z);
+        return;
+    }
+    
+    const moveSpeed = 0.1;
+    
+    // Calculate forward and right based on ELF's rotation, not camera
+    const elfRotation = elf.rotation.y;
+    
+    // Forward direction based on elf's facing
+    const forward = new THREE.Vector3(
+        Math.sin(elfRotation),
+        0,
+        Math.cos(elfRotation)
+    );
+    
+    // Right direction (90 degrees from forward)
+    const right = new THREE.Vector3(
+        Math.sin(elfRotation + Math.PI / 2),
+        0,
+        Math.cos(elfRotation + Math.PI / 2)
+    );
+    
+    // Move in only ONE direction (use else if to prevent diagonals)
+    if (keysPressed['arrowup']) {
+        elf.position.x += forward.x * moveSpeed;
+        elf.position.z += forward.z * moveSpeed;
+    } else if (keysPressed['arrowdown']) {
+        elf.position.x -= forward.x * moveSpeed;
+        elf.position.z -= forward.z * moveSpeed;
+    } else if (keysPressed['arrowleft']) {
+        elf.position.x += right.x * moveSpeed;
+        elf.position.z += right.z * moveSpeed;
+    } else if (keysPressed['arrowright']) {
+        elf.position.x -= right.x * moveSpeed;
+        elf.position.z -= right.z * moveSpeed;
+    }
+    
+    elf.position.y = getHeightAt(elf.position.x, elf.position.z);
+}
+
+export function lookAround(){
     // Find the elf if we don't have a reference yet
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
@@ -283,39 +380,24 @@ export function moveElf(){
         return;
     }
 
-    // Move based on keyboard input FIRST
-    if (keysPressed['w']) {
-        elf.position.z -= 0.1;
-        // Make the elf face the -z direction when moving forward ('w')
-        if (elf) {
-            elf.rotation.y = Math.PI;
-        }
-    }
+    // A/D keys: Turn left/right (rotate the elf)
+    const turnSpeed = 0.05; // Adjust this value to control turn speed
     if (keysPressed['a']) {
-        elf.position.x -= 0.1;
-        // Make the elf face the -x direction when moving forward ('a')
-        if (elf) {
-            elf.rotation.y = -Math.PI / 2;
-        }
-    }
-    if (keysPressed['s']) {
-        elf.position.z += 0.1;
-        // Make the elf face the z direction when moving forward ('s')
-        if (elf) {
-            elf.rotation.y = 0;
-        }
+        elf.rotation.y += turnSpeed; // Turn left
     }
     if (keysPressed['d']) {
-        elf.position.x += 0.1;
-        // Make the elf face the x direction when moving forward ('d')
-        if (elf) {
-            elf.rotation.y = Math.PI / 2;
-        }
+        elf.rotation.y -= turnSpeed; // Turn right
     }
-
-    // Then update ground height at the new position
-    const groundHeight = getHeightAt(elf.position.x, elf.position.z);
-    elf.position.y = groundHeight;
+    
+    // W/S keys: Look up/down (adjust camera pitch)
+    const lookSpeed = 0.02; // Adjust this value to control look speed
+    const maxPitch = Math.PI / 3; // Limit pitch to 60 degrees up/down
+    if (keysPressed['w']) {
+        cameraPitch = Math.min(cameraPitch + lookSpeed, maxPitch); // Look up
+    }
+    if (keysPressed['s']) {
+        cameraPitch = Math.max(cameraPitch - lookSpeed, -maxPitch); // Look down
+    }
 }
 
 /**
@@ -388,24 +470,40 @@ function getHeightAt(x, z){
 // Initialize keyboard listeners once
 function initKeyboardListeners(){
     window.addEventListener('keydown', (e) => {
-        const key = e.key.toLowerCase();
+        let key = e.key.toLowerCase();
+        // Handle arrow keys
+        if (e.key.startsWith('Arrow')) {
+            key = 'arrow' + e.key.slice(5).toLowerCase(); // 'ArrowUp' -> 'arrowup'
+        }
         switch (key) {
             case 'w':
             case 'a':
             case 's':
             case 'd':
+            case 'arrowup':
+            case 'arrowdown':
+            case 'arrowleft':
+            case 'arrowright':
                 keysPressed[key] = true;
                 e.preventDefault(); // Prevent default behavior
                 break;
         }
     });
     window.addEventListener('keyup', (e) => {
-        const key = e.key.toLowerCase();
+        let key = e.key.toLowerCase();
+        // Handle arrow keys
+        if (e.key.startsWith('Arrow')) {
+            key = 'arrow' + e.key.slice(5).toLowerCase(); // 'ArrowUp' -> 'arrowup'
+        }
         switch (key) {
             case 'w':
             case 'a':
             case 's':
             case 'd':
+            case 'arrowup':
+            case 'arrowdown':
+            case 'arrowleft':
+            case 'arrowright':
                 keysPressed[key] = false;
                 e.preventDefault(); // Prevent default behavior
                 break;
@@ -1672,6 +1770,10 @@ async function addLogsAroundCampfire(){
     return logGroup;
 }
 
+function makeFireCrackle(){
+    //use spacial sound to make fire crackle as you get closer to the campfire
+}
+
 function createPath(){
     //I want to create a path that makes a loop around the scene (outside of the cottage [the path should lead to the frontdoor], around the capfire, and around the pond)
     //I want it to be made up of a bunch of stones (reuse the same geometry and transform as needed)
@@ -1691,6 +1793,7 @@ export async function setupOutdoorScene(){
     //createMoon();
     //await generateClouds();
     await generateElfAtOrigin();
+    //followElf();
     await generateCottage();
     addChristmasLightsToCottage();
     generateSnow();
