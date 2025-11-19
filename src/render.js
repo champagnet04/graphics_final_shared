@@ -59,9 +59,10 @@ async function init() {
     function animate() {
         requestAnimationFrame(animate);
         controls.update(); // Update controls
-        lookAround(); // Handle A/D turning and W/S looking up/down
-        moveElf(); // Handle arrow key movement
-        followElf(); // Update camera to follow elf
+        // Temporarily disabled for path work - allows OrbitControls to work
+        // lookAround(); // Handle A/D turning and W/S looking up/down
+        // moveElf(); // Handle arrow key movement
+        // followElf(); // Update camera to follow elf
         checkCampfireProximity(); // Check if elf is near campfire and resume audio
         updateSnow(); // Update snow particles
         if (northernLights) {

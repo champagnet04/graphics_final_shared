@@ -2471,17 +2471,213 @@ function makeFireCrackle(fire){
     );
 }
 
-function createPath(){
-    //I want to create a path that makes a loop around the scene (outside of the cottage [the path should lead to the frontdoor], around the capfire, and around the pond)
-    //I want it to be made up of a bunch of stones (reuse the same geometry and transform as needed)
-    //generate the needed code below
-    const path = new THREE.Group();
-    for (let i = 0; i < 10; i++) {
-        const stone = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({color: 0x8B4513}));
-        stone.position.set(Math.random() * 10 - 5, 0, Math.random() * 10 - 5);
-        path.add(stone);
+function loadStoneTexture(){
+    const loader = new THREE.TextureLoader();
+    const stoneTexture = loader.load('/textures/stone.png');
+    stoneTexture.wrapS = THREE.RepeatWrapping;
+    stoneTexture.wrapT = THREE.RepeatWrapping;
+    stoneTexture.repeat.set(10, 10);
+    return stoneTexture;
+}
+
+async function loadPeppermint(){
+    const loader = new GLTFLoader();
+    try {
+        const gltf = await loader.loadAsync('/models/peppermint_candy/scene.gltf');
+        const log = gltf.scene.clone();
+        log.name = 'peppermint';
+        
+        log.castShadow = true;
+        log.receiveShadow = true;
+        log.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+
+        log.scale.setScalar(0.2);
+        
+        return log;
+    } catch (error) {
+        console.error('Error details:', error.message, error.stack);
     }
-    scene.add(path);
+    return null;
+}
+
+/**
+ * Creates and returns a closed Catmull-Rom spline path for the scene.
+ *
+ * This function generates a smooth, continuous loop (using THREE.CatmullRomCurve3)
+ * based on the points provided by getPathPoints(). The path is intended to
+ * outline a walkable route around the scene, circling major landmarks such as the cottage,
+ * campfire, and pond, while maintaining appropriate clearances from obstacles
+ * and the scene edges. The resulting path can be used for placing decorative stones,
+ * animating objects, or guiding camera movement.
+ *
+ * @returns {THREE.CatmullRomCurve3} The closed Catmull-Rom curve representing the scene path.
+ */
+function createPath(){
+    const path = new THREE.CatmullRomCurve3(getPathPoints(), true);
+
+    return path;
+}
+
+/**
+ * Generates an array of THREE.Vector3 points that define a looping path around the scene.
+ *
+ * The path is constructed to avoid scene objects as defined in sceneObjects, maintaining a minimum clearance,
+ * and also ensuring the path stays inside the bounds of the ground (groundBounds), away from the scene edges.
+ * The routine employs a configurable number of points to create a smooth loop (via CatmullRomCurve3), and can
+ * apply a repulsive force from sceneObjects to keep sufficient distance. The number of points, smoothing passes,
+ * and clearances from objects/bounds are all configurable in the function.
+ *
+ * @returns {THREE.Vector3[]} An array of THREE.Vector3 objects representing the points of the looped path.
+ */
+function getPathPoints(){
+    const PATH_CLEARANCE = 4; // Minimum distance from scene objects
+    const EDGE_CLEARANCE = 5; // Distance from scene edges
+    const POINT_COUNT = 100; // Number of points to generate for the loop
+    const REPULSION_RANGE = 15; // How far objects push the path away
+    const SMOOTHING_ITERATIONS = 3; // Number of smoothing passes
+    
+    // Calculate repulsion force from all scene objects at a given point
+    const getRepulsionForce = (x, z) => {
+        let forceX = 0;
+        let forceZ = 0;
+        
+        for (const obj of sceneObjects) {
+            const dx = x - obj.x;
+            const dz = z - obj.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            const requiredSpacing = (obj.minSpacing || 0) + PATH_CLEARANCE;
+            
+            if (dist < REPULSION_RANGE && dist > 0.01) {
+                const pushStrength = Math.max(0, (REPULSION_RANGE - dist) / REPULSION_RANGE);
+                const pushAmount = (requiredSpacing - dist) * pushStrength;
+                
+                const dirX = dx / dist;
+                const dirZ = dz / dist;
+                forceX += dirX * pushAmount * 0.5;
+                forceZ += dirZ * pushAmount * 0.5;
+            }
+        }
+        
+        return { forceX, forceZ };
+    };
+    
+    // Keep point within bounds
+    const clampToBounds = (x, z) => {
+        x = Math.max(groundBounds.xMin + EDGE_CLEARANCE, Math.min(groundBounds.xMax - EDGE_CLEARANCE, x));
+        z = Math.max(groundBounds.zMin + EDGE_CLEARANCE, Math.min(groundBounds.zMax - EDGE_CLEARANCE, z));
+        return { x, z };
+    };
+    
+    const basePoints = [];
+    const centerX = (groundBounds.xMin + groundBounds.xMax) / 2;
+    const centerZ = (groundBounds.zMin + groundBounds.zMax) / 2;
+    const radiusX = (groundBounds.xMax - groundBounds.xMin) / 2 - EDGE_CLEARANCE;
+    const radiusZ = (groundBounds.zMax - groundBounds.zMin) / 2 - EDGE_CLEARANCE;
+    
+    for (let i = 0; i < POINT_COUNT; i++) {
+        const angle = (i / POINT_COUNT) * Math.PI * 2;
+        const x = centerX + Math.cos(angle) * radiusX;
+        const z = centerZ + Math.sin(angle) * radiusZ;
+        basePoints.push({ x, z });
+    }
+    
+    let currentPoints = basePoints.map(p => ({ ...p }));
+    
+    for (let iteration = 0; iteration < 10; iteration++) {
+        const newPoints = [];
+        
+        for (let i = 0; i < currentPoints.length; i++) {
+            let x = currentPoints[i].x;
+            let z = currentPoints[i].z;
+            
+            const force = getRepulsionForce(x, z);
+            x += force.forceX;
+            z += force.forceZ;
+            
+            const clamped = clampToBounds(x, z);
+            x = clamped.x;
+            z = clamped.z;
+            
+            newPoints.push({ x, z });
+        }
+        
+        currentPoints = newPoints;
+    }
+    
+    for (let smoothIter = 0; smoothIter < SMOOTHING_ITERATIONS; smoothIter++) {
+        const smoothed = [];
+        
+        for (let i = 0; i < currentPoints.length; i++) {
+            const prev = currentPoints[(i - 1 + currentPoints.length) % currentPoints.length];
+            const curr = currentPoints[i];
+            const next = currentPoints[(i + 1) % currentPoints.length];
+            
+            let x = (prev.x + curr.x + next.x) / 3;
+            let z = (prev.z + curr.z + next.z) / 3;
+            
+            const force = getRepulsionForce(x, z);
+            x += force.forceX * 0.3;
+            z += force.forceZ * 0.3;
+            
+            const clamped = clampToBounds(x, z);
+            smoothed.push({ x: clamped.x, z: clamped.z });
+        }
+        
+        currentPoints = smoothed;
+    }
+    
+    const pathPoints = [];
+    for (const point of currentPoints) {
+        const y = getHeightAt(point.x, point.z);
+        pathPoints.push(new THREE.Vector3(point.x, y, point.z));
+    }
+    
+    if (pathPoints.length > 0) {
+        pathPoints.push(pathPoints[0].clone());
+    }
+    
+    return pathPoints;
+}
+
+/**
+ * Asynchronously places peppermint candy models along a given path in the scene.
+ *
+ * This function loads a peppermint candy 3D model, clones it multiple times, and positions each clone
+ * at evenly spaced intervals along the provided THREE.Curve path. All candy models are grouped together in a
+ * THREE.Group, which is then added to the scene. If the peppermint model fails to load, a warning is logged
+ * and nothing is added to the scene.
+ *
+ * @async
+ * @function
+ * @param {THREE.Curve} path - The path along which to distribute the candies. Should support getPoint(t).
+ * @returns {Promise<THREE.Group|undefined>} Returns a Promise resolving to the group containing all placed candies, or undefined if the model fails to load.
+ */
+async function addCandyToPath(path){
+    const candies = new THREE.Group();
+    const candyCount = 200;
+    
+    const peppermintTemplate = await loadPeppermint();
+    if (!peppermintTemplate) {
+        console.warn('Peppermint model failed to load');
+        return;
+    }
+    
+    for (let i = 0; i < candyCount; i++) {
+        const t = i / candyCount;
+        const point = path.getPoint(t);
+        const candy = peppermintTemplate.clone();
+        candy.scale.setScalar(1);
+        candy.position.set(point.x, point.y - 0.2, point.z);
+        candies.add(candy);
+    }
+    
+    scene.add(candies);
+    return candies;
 }
 
 export async function setupOutdoorScene(){    
@@ -2501,6 +2697,7 @@ export async function setupOutdoorScene(){
     await generateTrees();   
     initKeyboardListeners();
     createNorthernLights();
+    await addCandyToPath(createPath());
     //createPath();
     console.log('Scene setup complete');
     return { scene, camera };
