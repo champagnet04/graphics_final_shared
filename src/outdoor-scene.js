@@ -15,6 +15,8 @@ export let northernLights = null;
 let snowmanGroup = null;
 let campfireGroup = null;
 
+let ballGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+
 const snowMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     side: THREE.DoubleSide,
@@ -2724,6 +2726,98 @@ export function makeSnowmanSpeak(){
     speechSynthesis.speak(speech);
 }
 
+function createSnowball(){
+    const snowball = new THREE.Mesh(ballGeometry, snowMaterial);
+    return snowball;
+}
+
+/**
+ * Creates and adds a pile of snowballs to the scene at a fixed location.
+ *
+ * This function generates a group of 100 snowball meshes, distributed in a small random area
+ * near the specified coordinates (50, 0) in world space. Each snowball's local Y position
+ * is adjusted according to the terrain height at its world placement. The snowballs are grouped
+ * together and positioned as a single pile. The pile is added to both the scene and the
+ * sceneObjects array for management.
+ *
+ * Typical use: a decorative or interactive pile of snowballs for the outdoor winter scene.
+ */
+function createSnowballPile() {
+    const snowballPile = new THREE.Group();
+    snowballPile.name = 'snowballPile';
+    const groupWorldX = 50;
+    const groupWorldZ = 0;
+    const groupWorldY = getHeightAt(groupWorldX, groupWorldZ);
+    
+    snowballPile.position.set(groupWorldX, groupWorldY, groupWorldZ);
+    
+    for (let i = 0; i < 100; i++) {
+        const snowball = createSnowball();
+        const localX = Math.random() * 5 - 1;
+        const localZ = Math.random() * 5 - 1;
+        
+        const worldX = groupWorldX + localX;
+        const worldZ = groupWorldZ + localZ;
+        const worldY = getHeightAt(worldX, worldZ);
+        
+        const localY = worldY - groupWorldY;
+        snowball.position.set(localX, localY, localZ);
+        snowballPile.add(snowball);
+    }
+    
+    sceneObjects.push(snowballPile);
+    scene.add(snowballPile);
+}
+
+export function pickUpSnowball(){
+    console.log('pickUpSnowball');
+    //when you click the snowballPile, a snowball generates in you hand
+    if (!elf) {
+        elf = scene.children.find(child => child.name === 'elf');
+    }
+    
+    if (!elf) {
+        return null;
+    }
+    
+    const snowball = createSnowball();
+    
+    // Position relative to elf: in front and at hand height
+    const handOffset = 0.8; // Height offset for hand position
+    const forwardOffset = 0.5; // Distance in front of elf
+    const sideOffset = 0.3; // Slight offset to the right (elf's right)
+    
+    // Calculate position based on elf's rotation
+    const elfRotation = elf.rotation.y;
+    const forwardX = Math.sin(elfRotation) * forwardOffset;
+    const forwardZ = Math.cos(elfRotation) * forwardOffset;
+    const rightX = Math.sin(elfRotation + Math.PI / 2) * sideOffset;
+    const rightZ = Math.cos(elfRotation + Math.PI / 2) * sideOffset;
+    
+    // World position relative to elf
+    const worldX = elf.position.x + forwardX + rightX;
+    const worldY = elf.position.y + handOffset;
+    const worldZ = elf.position.z + forwardZ + rightZ;
+    
+    snowball.position.set(worldX, worldY, worldZ);
+    scene.add(snowball);
+    
+    return snowball;
+}
+
+function throwSnowball(){
+    //when you click on any object/location, the snowball is thrown along that line (maybe with some physics so it fall towards the ground)
+    //when the snowball hits the ground it morphs into a splat shape & make a sound effect
+}
+
+function morphSnowballIntoSplat(){
+
+}
+
+function makeSplatSound(){
+
+}
+
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
@@ -2741,6 +2835,7 @@ export async function setupOutdoorScene(){
     await generateTrees();   
     initKeyboardListeners();
     createNorthernLights();
+    createSnowballPile();
     await addCandyToPath(createPath());
     //createPath();
     console.log('Scene setup complete');

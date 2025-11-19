@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { setupOutdoorScene } from './outdoor-scene.js';
-import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity, makeSnowmanSpeak } from './outdoor-scene.js';
+import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity, makeSnowmanSpeak, pickUpSnowball } from './outdoor-scene.js';
 
 // Initialize the scene asynchronously
 async function init() {
@@ -24,28 +24,53 @@ async function init() {
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     
+    function checkIfSnowballPile(intersects) {
+        for (const intersect of intersects) {
+            let obj = intersect.object;
+            while (obj) {
+                if (obj.name === 'snowballPile') {
+                    pickUpSnowball();
+                    return true;
+                }
+                obj = obj.parent;
+            }
+        }
+        return false;
+    }
+    
+    function checkIfSnowman(intersects) {
+        for (const intersect of intersects) {
+            let obj = intersect.object;
+            while (obj) {
+                if (obj.type === 'Group' && obj.name !== 'snowballPile' && obj.children.length > 0) {
+                    if (obj.children.length < 20 && obj.children.some(part => 
+                        part.type === 'Mesh' && 
+                        part.geometry && 
+                        part.geometry.type === 'SphereGeometry'
+                    )) {
+                        makeSnowmanSpeak();
+                        return true;
+                    }
+                }
+                obj = obj.parent;
+            }
+        }
+        return false;
+    }
+    
     function onMouseClick(event) {
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         
         raycaster.setFromCamera(mouse, camera);
         
-        const snowmen = scene.children.filter(child => {
-            if (child.type === 'Group' && child.children.length > 0) {
-                return child.children.some(part => 
-                    part.type === 'Mesh' && 
-                    part.geometry && 
-                    part.geometry.type === 'SphereGeometry'
-                );
-            }
-            return false;
-        });
+        const allIntersects = raycaster.intersectObjects(scene.children, true);
         
-        const intersects = raycaster.intersectObjects(snowmen, true);
-        
-        if (intersects.length > 0) {
-            makeSnowmanSpeak();
+        if (checkIfSnowballPile(allIntersects)) {
+            return;
         }
+        
+        checkIfSnowman(allIntersects);
     }
     
     renderer.domElement.addEventListener('click', onMouseClick);
