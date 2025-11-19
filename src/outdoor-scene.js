@@ -362,12 +362,19 @@ async function createCloud(){
     }
 }
 
+
 /**
- * Generates a bunch of clouds in the sky
- * @returns {Promise<void>}
+ * Asynchronously generates and adds multiple cloud objects to the scene.
+ *
+ * This function creates 50 clouds by calling the createCloud() function for each,
+ * ensuring all clouds are created and added asynchronously. Uses Promise.all to
+ * await completion of all cloud creation tasks before resolving.
+ *
+ * @async
+ * @function
+ * @returns {Promise<void>} Resolves when all cloud objects have been created and added to the scene.
  */
-async function generateClouds(){
-    //randomly place a bunch of clouds in the sky
+async function generateClouds() {
     const clouds = [];
     for (let i = 0; i < 50; i++) {
         clouds.push(createCloud());
@@ -375,23 +382,27 @@ async function generateClouds(){
     await Promise.all(clouds);
 }
 
+/**
+ * Asynchronously loads the Christmas elf 3D model and adds it to the scene at the origin.
+ *
+ * This function loads the 'christmas_elf' model from the /models directory using GLTFLoader,
+ * clones the loaded scene, scales and positions the elf at the world origin (0, 0, 0),
+ * and adds it to the global scene. The elf object is referenced globally as 'elf'
+ * for future interaction. If loading fails, an error is logged and nothing is returned.
+ *
+ * @async
+ * @function
+ * @returns {Promise<THREE.Object3D|undefined>} Resolves to the added elf object, or undefined if loading fails.
+ */
 async function generateElfAtOrigin(){
     const loader = new GLTFLoader();
     try {
-        // Use the static file path - webpack dev server serves from /models
-        // This ensures both .gltf and .bin files are accessible
         const gltf = await loader.loadAsync('/models/christmas_elf/scene.gltf');
-        elf = gltf.scene.clone(); // Clone so we can reuse the model
+        elf = gltf.scene.clone();
         
-        // Set a name so we can find it later
         elf.name = 'elf';
-        
-        // Scale and position the elf
         elf.position.set(0, 0, 0);
-        
-        // The model might be large, so we may need to scale it down
-        // Adjust scale as needed based on the model size
-        elf.scale.setScalar(0.04); // Scale down if needed
+        elf.scale.setScalar(0.04);
         
         scene.add(elf);
         return elf;
@@ -400,13 +411,31 @@ async function generateElfAtOrigin(){
     }
 }
 
+/**
+ * Moves the elf character in the scene based on arrow key inputs.
+ *
+ * The movement is relative to the elf's current facing direction (its y-rotation),
+ * allowing the elf to move forward, backward, or strafe left/right on the XZ plane.
+ * Only one direction is allowed at a time (no diagonal movement).
+ * Arrow key states are tracked via the keysPressed object:
+ *   - 'arrowup'    : Move forward
+ *   - 'arrowdown'  : Move backward
+ *   - 'arrowleft'  : Strafe left
+ *   - 'arrowright' : Strafe right
+ * 
+ * After moving, the elf's Y position is set to match the ground or pond height at its new location.
+ * If no arrow keys are pressed, but the elf exists, its Y position is updated to keep it on the surface.
+ * If an elf reference is not available, this function will attempt to find the elf object in the scene.
+ *
+ * @export
+ * @function moveElf
+ */
 export function moveElf(){
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
     }
     if (!elf) return;
     
-    // Check if any arrow key is pressed
     if (!keysPressed['arrowup'] && !keysPressed['arrowdown'] && 
         !keysPressed['arrowleft'] && !keysPressed['arrowright']) {
         elf.position.y = getHeightAt(elf.position.x, elf.position.z);
@@ -415,24 +444,20 @@ export function moveElf(){
     
     const moveSpeed = 0.1;
     
-    // Calculate forward and right based on ELF's rotation, not camera
     const elfRotation = elf.rotation.y;
     
-    // Forward direction based on elf's facing
     const forward = new THREE.Vector3(
         Math.sin(elfRotation),
         0,
         Math.cos(elfRotation)
     );
     
-    // Right direction (90 degrees from forward)
     const right = new THREE.Vector3(
         Math.sin(elfRotation + Math.PI / 2),
         0,
         Math.cos(elfRotation + Math.PI / 2)
     );
     
-    // Move in only ONE direction (use else if to prevent diagonals)
     if (keysPressed['arrowup']) {
         elf.position.x += forward.x * moveSpeed;
         elf.position.z += forward.z * moveSpeed;
@@ -450,97 +475,115 @@ export function moveElf(){
     elf.position.y = getHeightAt(elf.position.x, elf.position.z);
 }
 
+/**
+ * Adjusts the elf's rotation and the camera's pitch based on user keyboard input.
+ *
+ * This function allows the player to look around by:
+ *   - Rotating the elf left/right with the A/D keys.
+ *   - Adjusting the camera's vertical pitch up/down with the W/S keys.
+ *
+ * The function will first attempt to obtain a reference to the elf in the scene if one is not already available.
+ * If 'elf' is not present in the scene, the function returns early.
+ *
+ * Controls:
+ *   - 'a': Turn the elf left (increase rotation.y)
+ *   - 'd': Turn the elf right (decrease rotation.y)
+ *   - 'w': Look up (increase cameraPitch, limited by maxPitch)
+ *   - 's': Look down (decrease cameraPitch, limited by -maxPitch)
+ *
+ * Turn and look speeds are adjustable via the turnSpeed and lookSpeed constants below.
+ * The camera pitch is clamped between -maxPitch and maxPitch radians.
+ *
+ * @export
+ * @function lookAround
+ */
 export function lookAround(){
-    // Find the elf if we don't have a reference yet
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
     }
     
-    // If elf still doesn't exist, return early
     if (!elf) {
         return;
     }
 
-    // A/D keys: Turn left/right (rotate the elf)
-    const turnSpeed = 0.05; // Adjust this value to control turn speed
+    const turnSpeed = 0.05;
     if (keysPressed['a']) {
-        elf.rotation.y += turnSpeed; // Turn left
+        elf.rotation.y += turnSpeed;
     }
     if (keysPressed['d']) {
-        elf.rotation.y -= turnSpeed; // Turn right
+        elf.rotation.y -= turnSpeed;
     }
     
-    // W/S keys: Look up/down (adjust camera pitch)
-    const lookSpeed = 0.02; // Adjust this value to control look speed
-    const maxPitch = Math.PI / 3; // Limit pitch to 60 degrees up/down
+    const lookSpeed = 0.02;
+    const maxPitch = Math.PI / 3;
     if (keysPressed['w']) {
-        cameraPitch = Math.min(cameraPitch + lookSpeed, maxPitch); // Look up
+        cameraPitch = Math.min(cameraPitch + lookSpeed, maxPitch);
     }
     if (keysPressed['s']) {
-        cameraPitch = Math.max(cameraPitch - lookSpeed, -maxPitch); // Look down
+        cameraPitch = Math.max(cameraPitch - lookSpeed, -maxPitch);
     }
 }
 
 /**
- * LATER ON YOU NEED TO EXTRACT A HELPER THAT YOU CAN PASS GROUND & POND TO
- * @param {} x 
- * @param {*} z 
- * @returns 
+ * Helper function to get the height at a given (x, z) position by raycasting against a mesh object.
+ * 
+ * @param {THREE.Object3D} mesh - The mesh object to raycast against (e.g., ground or pond)
+ * @param {number} x - X coordinate in world space
+ * @param {number} z - Z coordinate in world space
+ * @returns {number|null} The Y coordinate (height) at the given position, or null if no intersection
  */
-function getHeightAt(x, z){
-    let groundHeight = 0;
-    let pondHeight = null;
-    
-    // Check ground height
-    if (ground) {
-        // Ensure ground matrix is up to date
-        ground.updateMatrixWorld();
-        
-        // Cast a ray downward from above to find ground height
-        const raycaster = new THREE.Raycaster();
-        const origin = new THREE.Vector3(x, 1000, z); // start high above the scene
-        const direction = new THREE.Vector3(0, -1, 0); // straight down
-        raycaster.set(origin, direction);
-
-        const intersects = raycaster.intersectObject(ground, false);
-
-        if (intersects.length > 0) {
-            groundHeight = intersects[0].point.y;
-        } else {
-            // Fallback: calculate height using the same formula as modifyTerrainHeights
-            groundHeight = Math.sin(x * 0.05) * Math.cos(-z * 0.05) * 5;
-        }
+function getHeightFromMesh(mesh, x, z) {
+    if (!mesh) {
+        return null;
     }
     
-    // Check pond height if pond exists
+    mesh.updateMatrixWorld();
+    
+    const raycaster = new THREE.Raycaster();
+    const origin = new THREE.Vector3(x, 1000, z);
+    const direction = new THREE.Vector3(0, -1, 0);
+    raycaster.set(origin, direction);
+    
+    const intersects = raycaster.intersectObject(mesh, false);
+    
+    if (intersects.length > 0) {
+        return intersects[0].point.y;
+    }
+    
+    return null;
+}
+
+/**
+ * Gets the height at a given (x, z) position by checking both ground and pond surfaces.
+ * 
+ * For the ground, if raycasting fails, falls back to calculating height using the terrain formula.
+ * For the pond, only checks if the point is within the pond's radius.
+ * Returns the higher of the two heights (elf walks on top of whichever is higher).
+ * 
+ * @param {number} x - X coordinate in world space
+ * @param {number} z - Z coordinate in world space
+ * @returns {number} The Y coordinate (height) at the given position
+ */
+function getHeightAt(x, z){
+    let groundHeight = getHeightFromMesh(ground, x, z);
+    
+    if (groundHeight === null) {
+        groundHeight = Math.sin(x * 0.05) * Math.cos(-z * 0.05) * 5;
+    }
+    
+    let pondHeight = null;
     if (pond) {
-        // Update pond matrix
-        pond.updateMatrixWorld();
-        
-        // Check if point is within the pond's circle
-        const pondCenterX = pond.position.x;
-        const pondCenterZ = pond.position.z;
-        const pondRadius = 25; // CircleGeometry radius
+        const pondRadius = 25;
         
         const distanceFromCenter = Math.sqrt(
-            Math.pow(x - pondCenterX, 2) + Math.pow(z - pondCenterZ, 2)
+            Math.pow(x - pond.position.x, 2) + Math.pow(z - pond.position.z, 2)
         );
         
         if (distanceFromCenter <= pondRadius) {
-            // Point is within the pond, get pond height
-            const raycaster = new THREE.Raycaster();
-            const origin = new THREE.Vector3(x, 1000, z);
-            const direction = new THREE.Vector3(0, -1, 0);
-            raycaster.set(origin, direction);
-            
-            const intersects = raycaster.intersectObject(pond, false);
-            if (intersects.length > 0) {
-                pondHeight = intersects[0].point.y;
-            }
+            pondHeight = getHeightFromMesh(pond, x, z);
         }
     }
     
-    // Return the higher of the two heights (elf walks on top of whichever is higher)
     if (pondHeight !== null) {
         return Math.max(groundHeight, pondHeight);
     }
