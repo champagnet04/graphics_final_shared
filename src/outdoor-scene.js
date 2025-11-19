@@ -190,74 +190,95 @@ function setupLights(){
 }
 
 /**
- * Modifies the terrain geometry to create smooth hills
- * Uses sine/cosine functions for natural-looking height variation
- * @param {THREE.BufferGeometry} geometry - The ground geometry to modify
+ * Modifies the height (Z coordinates) of a ground geometry to create natural rolling hills.
+ *
+ * The function takes in a THREE.BufferGeometry (typically PlaneGeometry), and for each vertex, uses a combination
+ * of sine and cosine functions to perturb the vertex height, producing smooth undulating hills and valleys. 
+ *
+ * Geometry Orientation Notes:
+ *   - PlaneGeometry is in the XY plane (Z=0), but the ground is rotated -90° around X after creation.
+ *   - Thus, X remains X (width), Y becomes -Z (depth in world space), Z becomes Y (height/up in world space).
+ *
+ * Side Effects:
+ *   - Alters the given geometry in-place, updating all Z values.
+ *   - Flags the geometry to update vertex positions.
+ *   - Recomputes vertex normals for proper lighting.
+ *
+ * @param {THREE.BufferGeometry} geometry - The ground geometry to be modified in-place.
  */
 function modifyTerrainHeights(geometry) {
     const positions = geometry.attributes.position;
     const vertex = new THREE.Vector3();
     
-    // Loop through all vertices
     for (let i = 0; i < positions.count; i++) {
-        // Get the current vertex position
         vertex.fromBufferAttribute(positions, i);
         
-        // PlaneGeometry is created in XY plane (Z=0), but after -90° rotation around X:
-        // - X stays X (width in world space)
-        // - Y becomes -Z (depth in world space)
-        // - Z becomes Y (height/up in world space)
-        // So we use vertex.x and vertex.y to calculate height variation,
-        // then set the Z component (which becomes Y/up after rotation)
         const height = Math.sin(vertex.x * 0.05) * Math.cos(vertex.y * 0.05) * 5;
         
-        // Modify the Z component (which will become the Y/up direction after rotation)
         positions.setZ(i, height);
     }
     
-    // Mark the position attribute as needing an update
     positions.needsUpdate = true;
     
-    // Recalculate normals for proper lighting
     geometry.computeVertexNormals();
 }
 
+/**
+ * Creates and adds the ground mesh to the scene.
+ *
+ * - Generates a large plane geometry to represent the snowy ground.
+ * - Modifies the plane geometry in-place to create rolling hills using the `modifyTerrainHeights` function,
+ *   resulting in smooth, natural undulations.
+ * - Applies a snow material with a repeating snow texture.
+ * - Rotates the ground mesh so it's horizontal (flat), and positions it at ground level (y = 0).
+ * - Enables shadow casting and receiving for realistic lighting effects.
+ * - Adds the ground mesh to the global scene.
+ *
+ * Side effects:
+ *   - Updates the global `ground` variable.
+ *   - Adds the ground to the global scene.
+ */
 function createGround(){
     // TO DO: make the ground smoother (get rid of the lines and make it smooth)
     const groundGeometry = new THREE.PlaneGeometry(200, 100, 50, 25);
     
-    // Modify the terrain to create smooth hills
     modifyTerrainHeights(groundGeometry);
 
     ground = new THREE.Mesh(groundGeometry, snowMaterial);
-    ground.rotation.x = -Math.PI / 2; // Rotate plane to be horizontal
-    ground.position.y = 0; // Position at ground level
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
     ground.castShadow = true;
     ground.receiveShadow = true;
     scene.add(ground);
 }
 
-function loadSnowTexture(){
+/**
+ * Loads and configures the snow texture used for the ground.
+ *
+ * - Loads the snow texture from '/textures/snow.png' using THREE.TextureLoader.
+ * - Sets the texture's wrapping mode to repeat in both S and T (horizontal and vertical) directions.
+ * - Repeats the texture 10 times in each direction for proper tiling across the ground mesh.
+ * - Handles errors if the texture fails to load and logs them to the console.
+ * - Ensures wrapping and repeat settings are applied both in the onLoad callback (for async loads)
+ *   and immediately after load (for synchronous loads, e.g., from browser cache).
+ *
+ * @returns {THREE.Texture} The configured snow texture ready to use in a material.
+ */
+function loadSnowTexture() {
     const loader = new THREE.TextureLoader();
     const snowTexture = loader.load(
         '/textures/snow.png',
-        // onLoad callback
         (texture) => {
-            // Configure texture wrapping and repeat for tiling
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.RepeatWrapping;
-            // Repeat the texture across the ground (adjust these values to control tile size)
-            texture.repeat.set(10, 10); // Repeat 10 times in each direction
+            texture.repeat.set(10, 10);
         },
-        // onProgress callback (optional)
         undefined,
-        // onError callback
         (error) => {
             console.error('Error loading snow texture:', error);
         }
     );
     
-    // Set wrapping and repeat immediately (in case texture loads synchronously)
     snowTexture.wrapS = THREE.RepeatWrapping;
     snowTexture.wrapT = THREE.RepeatWrapping;
     snowTexture.repeat.set(10, 10);
@@ -265,12 +286,21 @@ function loadSnowTexture(){
     return snowTexture;
 }
 
+
 /**
- * Generates a random position for a cloud in the sky
- * @returns {THREE.Vector3} A random position for a cloud in the sky
+ * Generates a random position vector for a cloud in the scene sky.
+ *
+ * - Ensures newly generated position does not overlap closely (within 5 units) with any previously generated cloud positions in the session.
+ * - Tries up to 100 times to find a non-overlapping position.
+ * - Positions are in world coordinates:
+ *   - x: Range from -100 to 100
+ *   - y: Range from 50 to 100 (height above ground)
+ *   - z: Range from -50 to 50
+ * - Records all previous positions statically on the function for future checks.
+ *
+ * @returns {THREE.Vector3} The generated cloud position in world coordinates.
  */
-function generateCloudPosition(){
-    // Keep track of previously generated cloud positions in this session
+function generateCloudPosition() {
     if (!generateCloudPosition.pastPositions) {
         generateCloudPosition.pastPositions = [];
     }
@@ -279,43 +309,45 @@ function generateCloudPosition(){
     do {
         cloudPosition = new THREE.Vector3(
             Math.random() * 200 - 100, // x: -100 to 100
-            Math.random() * 50 + 50,   // y: 10 to 20
+            Math.random() * 50 + 50,   // y: 50 to 100
             Math.random() * 100 - 50   // z: -50 to 50
         );
-        // Check whether this candidate is at least 5 units away from all existing
-        var tooClose = generateCloudPosition.pastPositions.some(pos => 
+
+        var tooClose = generateCloudPosition.pastPositions.some(pos =>
             pos.distanceTo(cloudPosition) < 5
         );
         attempt++;
     } while (tooClose && attempt < 100);
 
     generateCloudPosition.pastPositions.push(cloudPosition);
-    
+
     return cloudPosition;
 }
 
+
 /**
- * Creates a cloud in the sky at a random position
- * @returns {Promise<THREE.Group>} A promise that resolves to the cloud mesh
+ * Asynchronously creates a single cloud object and adds it to the scene.
+ *
+ * This function loads a GLTF model of a cloud from the /models/clouds/scene.gltf
+ * directory, clones it for reuse, scales it down for appropriate scene size, and
+ * positions it using a randomly generated, non-overlapping sky position.
+ * All mesh children within the model have shadows enabled (cast and receive).
+ *
+ * @async
+ * @function
+ * @returns {Promise<THREE.Object3D|undefined>} Returns the created cloud object added to the scene,
+ * or undefined if model loading fails.
  */
 async function createCloud(){
     const loader = new GLTFLoader();
     try {
-        // Use the static file path - webpack dev server serves from /models
-        // This ensures both .gltf and .bin files are accessible
         const gltf = await loader.loadAsync('/models/clouds/scene.gltf');
-        const cloud = gltf.scene.clone(); // Clone so we can reuse the model
+        const cloud = gltf.scene.clone();
         
-        // Scale and position the cloud
         cloud.position.copy(generateCloudPosition());
         
-        // The model might be large, so we may need to scale it down
-        // Adjust scale as needed based on the model size
-        cloud.scale.setScalar(0.01); // Scale down if needed
+        cloud.scale.setScalar(0.01);
         
-        // Enable shadows on the group and all its children (meshes)
-        // cloud.castShadow = true;
-        // cloud.receiveShadow = true;
         cloud.traverse((child) => {
             if (child.isMesh) {
                 child.castShadow = true;
