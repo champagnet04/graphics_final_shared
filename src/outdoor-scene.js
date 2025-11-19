@@ -36,14 +36,14 @@ const groundBounds = {
 };
 
 const lightColors = [
-    0xff0000, // Red
-    0xffff00, // Yellow
-    0x00ff00, // Green
-    0x00ffff, // Cyan
-    0x0000ff, // Blue
-    0xff00ff, // Magenta / Pink
-    0xffffff, // White
-    0xffa500  // Orange/gold (for warmth)
+    0xff0000,
+    0xffff00,
+    0x00ff00,
+    0x00ffff,
+    0x0000ff,
+    0xff00ff,
+    0xffffff,
+    0xffa500
 ];
 
 
@@ -645,7 +645,16 @@ function initKeyboardListeners() {
     });
 }
 
-async function generateCottage() {
+/**
+ * Loads the cottage GLTF model and applies custom material colors.
+ * 
+ * This function loads the winter house model, clones it, applies custom colors to materials
+ * based on their names, and enables shadows.
+ * 
+ * @async
+ * @returns {Promise<THREE.Object3D|null>} The loaded and configured cottage object, or null if loading fails
+ */
+async function loadCottage() {
     const loader = new GLTFLoader();
     
     try {
@@ -653,20 +662,14 @@ async function generateCottage() {
         const cottage = gltf.scene.clone();
         cottage.name = 'cottage';
         
-        const groundHeight = getHeightAt(25, 10);
-        cottage.position.set(25, (groundHeight + 7) / 2, 10);
-        cottage.scale.setScalar(0.009);
-        cottage.rotation.y = Math.PI;
-        
-        // Material color mapping from the GLTF file
         const materialColors = {
-            'testTile': new THREE.Color(0.0550536, 0.0564653, 0.0649351),     // Dark gray roof
-            'panel': new THREE.Color(0.345098, 0.509804, 0.564706),            // Blue siding
-            'housePaint': new THREE.Color(0.815686, 0.811765, 0.843137),       // Light gray/white
-            'snow': new THREE.Color(1.0, 1.0, 1.0),                            // White snow
-            'chimney': new THREE.Color(1.0, 1.0, 1.0),                         // Chimney (has texture)
-            'windowFrame': new THREE.Color(0.905882, 0.85098, 0.901961),       // Light window frames
-            'windowGlass': new THREE.Color(0.013200, 0.09649, 0.09649)         // Dark teal glass
+            'testTile': new THREE.Color(0.0550536, 0.0564653, 0.0649351),
+            'panel': new THREE.Color(0.345098, 0.509804, 0.564706),
+            'housePaint': new THREE.Color(0.815686, 0.811765, 0.843137),
+            'snow': new THREE.Color(1.0, 1.0, 1.0),
+            'chimney': new THREE.Color(1.0, 1.0, 1.0), 
+            'windowFrame': new THREE.Color(0.905882, 0.85098, 0.901961),
+            'windowGlass': new THREE.Color(0.013200, 0.09649, 0.09649)
         };
         
         cottage.traverse((child) => {
@@ -678,10 +681,9 @@ async function generateCottage() {
                 const targetColor = materialColors[matName];
                 
                 if (targetColor) {
-                    // Create new material with correct color
                     child.material = new THREE.MeshStandardMaterial({
                         color: targetColor,
-                        map: child.material.map || null,  // Keep texture if exists
+                        map: child.material.map || null,
                         metalness: 0.0,
                         roughness: 0.6,
                         side: THREE.DoubleSide,
@@ -696,18 +698,41 @@ async function generateCottage() {
             }
         });
         
-        // Create a group for the cottage and its lights
-        const cottageGroup = new THREE.Group();
-        cottageGroup.name = 'cottageGroup';
-        cottageGroup.add(cottage);
-        
-        // Position the group in the scene
-        scene.add(cottageGroup);
         console.log('Cottage loaded with manual material colors');
-        return cottageGroup;
+        return cottage;
     } catch (error) {
         console.error('Can\'t load model:', error);
+        return null;
     }
+}
+
+/**
+ * Generates and positions the cottage in the scene.
+ * 
+ * This function loads the cottage model, creates a group for it (and future lights),
+ * positions it at the specified location, and adds it to the scene.
+ * 
+ * @async
+ * @returns {Promise<THREE.Group|null>} The cottage group added to the scene, or null if loading fails
+ */
+async function generateCottage() {
+    const cottage = await loadCottage();
+    
+    if (!cottage) {
+        return null;
+    }
+    
+    const groundHeight = getHeightAt(25, 10);
+    cottage.position.set(25, (groundHeight + 7) / 2, 10);
+    cottage.scale.setScalar(0.009);
+    cottage.rotation.y = Math.PI;
+    
+    const cottageGroup = new THREE.Group();
+    cottageGroup.name = 'cottageGroup';
+    cottageGroup.add(cottage);
+    
+    scene.add(cottageGroup);
+    return cottageGroup;
 }
 
 function getCottage(){
