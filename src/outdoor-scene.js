@@ -818,6 +818,31 @@ function addDiagonalLights(startPoint, endPoint, spacing, points) {
 }
 
 /**
+ * Assigns colors to an array of light points by cycling through a color palette.
+ * 
+ * This function takes an array of 3D points and fills a Float32Array with RGB color values
+ * for each point. Colors are assigned by cycling through the provided color palette array,
+ * creating a repeating pattern of colors across all lights.
+ * 
+ * @param {Array<THREE.Vector3>} points - Array of 3D points representing light positions
+ * @param {Array<number>} colorPalette - Array of hex color values to cycle through (defaults to global lightColors)
+ * @returns {Float32Array} Float32Array of RGB values (length = points.length * 3)
+ */
+function addColorToLights(points, colorPalette = lightColors) {
+    const colors = new Float32Array(points.length * 3);
+    
+    points.forEach((point, i) => {
+        const colorIndex = i % colorPalette.length;
+        const c = new THREE.Color(colorPalette[colorIndex]);
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+    });
+    
+    return colors;
+}
+
+/**
  * Generates positions for decorative lights to be placed along the edges of a fence structure.
  *
  * The function calculates arrays of 3D positions (THREE.Vector3) corresponding to locations
@@ -892,145 +917,158 @@ function addLightsToTopFence(size, center){
     return points;
 }
 
+/**
+ * Generates positions for decorative lights to be placed along the back edge of the cottage roof.
+ *
+ * This function creates an array of 3D positions (THREE.Vector3) evenly spaced along the back horizontal edge
+ * of the roof, suitable for placing a string of lights or other decorations. The position and size parameters
+ * determine the exact coordinates, ensuring lights are positioned just above and behind the main roof edge.
+ *
+ * @param {THREE.Vector3} size - The overall size of the roof (width = x, height = y, depth = z)
+ * @param {THREE.Vector3} center - The center position of the roof in world coordinates
+ * @returns {THREE.Vector3[]} Array of points along the back roof edge for attaching lights
+ */
 function addLightsToRoofBackEdge(size, center){
     const points = [];
-    const spacing = 0.3; // Spacing between lights
+    const spacing = 0.3;
     
-    // Calculate cottage dimensions in world space
     const width = size.x;
-    const height = size.y;
     const depth = size.z;
     
     const baseY = center.y / 2;
 
-    //Front edge
     const backZ = center.z - depth / 2;
     addEdgeLights((center.x - width / 2) + 1.25, (center.x + width / 2) - 1.25, 'x', null, backZ + 5.15, baseY + 3.75, spacing, points);
 
     return points;
 }
 
+/**
+ * Generates an array of THREE.Vector3 positions for placing decorative lights along
+ * the left and right front roof edges of the cottage, following the diagonal edges from
+ * the lower corners up to the roof peak and then back down to the opposing lower corners
+ * (i.e., forming a "V" on each roof side in the Y/Z plane).
+ *
+ * The function calculates these positions based on the provided size and center position
+ * of the roof/cottage, taking into account offsets to align with the sloped roof edges and
+ * the roof peak. Lights are placed along both the left and right roof edges to give a festive
+ * outlined appearance to the roof's silhouette.
+ *
+ * @param {THREE.Vector3} size - The overall size of the roof (width = x, height = y, depth = z)
+ * @param {THREE.Vector3} center - The center position of the roof in world coordinates
+ * @returns {THREE.Vector3[]} Array of points along the left and right front roof diagonal edges for attaching lights
+ */
 function addLightsToRoofEdges(size, center){
     const points = [];
-    const spacing = 0.3; // Spacing between lights
+    const spacing = 0.3;
     
-    // Calculate cottage dimensions in world space
     const width = size.x;
     const height = size.y;
     const depth = size.z;
     
-    // Calculate the base height and roof peak height (lowered)
-    const baseHeight = center.y + height / 2; // Top of the walls
-    const roofPeakHeight = baseHeight - 1.75; // Peak of the roof (lowered)
+    const baseHeight = center.y + height / 2;
+    const roofPeakHeight = baseHeight - 1.75;
     
-    // Left side roof edge: goes from front edge, up to peak, down to back edge
-    const leftX = center.x - width / 2 + 1; // Left edge X position (matching top fence)
-    const frontZ = center.z + depth / 2 - 6; // Front edge Z position
-    const backZ = center.z - depth / 2 + 6; // Back edge Z position
+    const leftX = center.x - width / 2 + 1;
+    const frontZ = center.z + depth / 2 - 6;
+    const backZ = center.z - depth / 2 + 6;
     
-    // Front edge of left roof (lower Y)
     const leftFrontEdge = new THREE.Vector3(
         leftX,
-        baseHeight - 8,  // Lower edge of roof (lowered)
+        baseHeight - 8,
         frontZ
     );
     
-    // Peak of roof along left side (highest Y, center in Z)
     const leftPeak = new THREE.Vector3(
         leftX,
-        roofPeakHeight,   // Peak height
-        center.z          // Center of roof in Z
+        roofPeakHeight,
+        center.z
     );
     
-    // Back edge of left roof (lower Y)
     const leftBackEdge = new THREE.Vector3(
         leftX,
-        baseHeight - 8,  // Lower edge of roof (lowered)
+        baseHeight - 8,
         backZ
     );
     
-    // Add lights going up the front-left side of the roof
     addDiagonalLights(leftFrontEdge, leftPeak, spacing, points);
-    // Add lights going down the back-left side of the roof
     addDiagonalLights(leftPeak, leftBackEdge, spacing, points);
     
-    // Right side roof edge: same pattern
-    const rightX = center.x + width / 2 - 0.75; // Right edge X position (matching top fence)
+    const rightX = center.x + width / 2 - 0.75;
     
-    // Front edge of right roof (lower Y)
     const rightFrontEdge = new THREE.Vector3(
         rightX,
-        baseHeight - 8,  // Lower edge of roof (lowered)
+        baseHeight - 8,
         frontZ
     );
     
-    // Peak of roof along right side (highest Y, center in Z)
     const rightPeak = new THREE.Vector3(
         rightX,
-        roofPeakHeight,   // Peak height
-        center.z          // Center of roof in Z
+        roofPeakHeight,
+        center.z
     );
     
-    // Back edge of right roof (lower Y)
     const rightBackEdge = new THREE.Vector3(
         rightX,
-        baseHeight - 8,  // Lower edge of roof (lowered)
+        baseHeight - 8,
         backZ
     );
     
-    // Add lights going up the front-right side of the roof
     addDiagonalLights(rightFrontEdge, rightPeak, spacing, points);
-    // Add lights going down the back-right side of the roof
     addDiagonalLights(rightPeak, rightBackEdge, spacing, points);
     
     return points;
 }
 
+/**
+ * Adds animated Christmas lights to the cottage in the scene.
+ *
+ * This function retrieves the cottage and its group, calculates positions for lights
+ * along fences and roof edges, and generates colored points for decoration. The generated
+ * lights use a THREE.Points object with per-vertex color, giving the appearance of
+ * multi-color Christmas lights strung around the cottage. The lights are grouped with the
+ * cottage if the group exists, otherwise they are added directly to the scene.
+ *
+ * Prerequisites:
+ * - `getCottage()`: should return the cottage mesh or object3d.
+ * - `getCottageGroup()`: should return the group for the cottage, if any.
+ * - Functions `addLightsToFence`, `addLightsToTopFence`, `addLightsToRoofEdges`, and
+ *   `addLightsToRoofBackEdge` should generate arrays of THREE.Vector3s specifying
+ *   where the lights go.
+ * - Function `addColorToLights` should take an array of points and return an array of
+ *   RGB colors for each point.
+ *
+ * Returns:
+ *   undefined if lights added successfully,
+ *   null if the cottage is not found.
+ */
 function addChristmasLightsToCottage(){
-    // Find the cottage and group
     const cottage = getCottage();
     const cottageGroup = getCottageGroup();
     
     if (!cottage) {
-        console.warn('Cottage not found, cannot add lights');
         return null;
     }
     
-    // Update matrices to ensure world space calculations are correct
     cottage.updateMatrixWorld(true);
     
-    // Calculate the cottage's bounding box to get its dimensions
     const box = new THREE.Box3().setFromObject(cottage);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    
-    // The bounding box center is in world space, but since the cottage group
-    // is at the origin (0,0,0), world space coordinates = group local space coordinates
-    // So we can use the center directly for positioning lights in the group
-    
+        
     const points = addLightsToFence(size, center);
     const topPoints = addLightsToTopFence(size, center);
     const roofPoints = addLightsToRoofEdges(size, center);
     const roofBackPoints = addLightsToRoofBackEdge(size, center);
     
-    // Combine all points into a single array
     const allPoints = [...points, ...topPoints, ...roofPoints, ...roofBackPoints];
-    const colors = new Float32Array(allPoints.length * 3);
-    
-    // Assign Christmas light colors in sequence
-    allPoints.forEach((point, i) => {
-        const colorIndex = i % lightColors.length;
-        const c = new THREE.Color(lightColors[colorIndex]);
-        colors[i * 3] = c.r;
-        colors[i * 3 + 1] = c.g;
-        colors[i * 3 + 2] = c.b;
-    });
+    const colors = addColorToLights(allPoints);
     
     const geom = new THREE.BufferGeometry().setFromPoints(allPoints);
     geom.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
     
     const material = new THREE.PointsMaterial({
-        size: 0.15, // Slightly larger for visibility
+        size: 0.15,
         vertexColors: true,
         color: 0xffffff
     });
@@ -1038,23 +1076,31 @@ function addChristmasLightsToCottage(){
     const christmasLights = new THREE.Points(geom, material);
     christmasLights.name = 'christmasLights';
     
-    // Add lights to the cottage group instead of the scene
     if (cottageGroup) {
         cottageGroup.add(christmasLights);
     } else {
-        // Fallback: add to scene if group not found
-        console.warn('Cottage group not found, adding lights to scene');
         scene.add(christmasLights);
     }
-    
-    return christmasLights;
 }
 
-function setupSnowPoints(){
+/**
+ * Creates and returns a THREE.Points object representing falling snow particles.
+ *
+ * This function generates a specified number of snow particles (default: 25,000),
+ * randomly positions them within the specified world bounds (groundBounds), and
+ * assigns each a random velocity in the x and y directions to simulate snowfall.
+ *
+ * Each particle's position is stored in a THREE.BufferGeometry, and a custom
+ * 'velocity' attribute is added (each velocity has 2 components: x and y).
+ *
+ * The material is configured as semi-transparent white points.
+ *
+ * @returns {THREE.Points} A THREE.Points object representing all the snow particles,
+ *                         ready to be added to the scene.
+ */
+function setupSnowPoints() {
     const count = 25000;
       
-    
-    // Create particle positions
     const points = [];
     for (let i = 0; i < count; i++) {
         let particle = new THREE.Vector3(
@@ -1065,18 +1111,15 @@ function setupSnowPoints(){
         points.push(particle);
     }
     
-    // Create velocity array
     const velocityArray = new Float32Array(count * 2);
     for (let i = 0; i < count * 2; i += 2) {
         velocityArray[i] = ((Math.random() - 0.5) / 5) * 0.1;
         velocityArray[i + 1] = (Math.random() / 5) * 0.1 + 0.01;
     }
     
-    // Create geometry
     const geom = new THREE.BufferGeometry().setFromPoints(points);
     geom.setAttribute('velocity', new THREE.BufferAttribute(velocityArray, 2));
     
-    // Create material for snow
     const material = new THREE.PointsMaterial({
         color: 0xffffff,
         size: 0.05,
@@ -1084,22 +1127,47 @@ function setupSnowPoints(){
         opacity: 0.8
     });
     
-    // Create points object
     const snowPoints = new THREE.Points(geom, material);
     snowPoints.name = 'snow';
     
     return snowPoints;
 }
 
+/**
+ * Adds a snow particle system to the scene.
+ *
+ * This function initializes the falling snow effect by creating a
+ * THREE.Points object with randomly positioned snow particles using
+ * the setupSnowPoints() helper function, then adds it to the Three.js scene.
+ * 
+ * Should be called once during scene setup to enable continuous snow.
+ */
 function generateSnow(){
     const snowPoints = setupSnowPoints();
     scene.add(snowPoints);
-    return snowPoints;
 }
 
 /**
- * Updates snow particle positions based on their velocities
- * Should be called every frame in the render loop
+ * Wraps a value around boundaries, returning the opposite boundary when exceeded.
+ * 
+ * @param {number} value - The value to wrap
+ * @param {number} min - Minimum boundary
+ * @param {number} max - Maximum boundary
+ * @returns {number} The wrapped value (min if value > max, max if value < min, otherwise value)
+ */
+const wrapBoundary = (value, min, max) => value < min ? max : value > max ? min : value;
+
+/**
+ * Updates the snow particle system by animating the position of snowflakes.
+ *
+ * This function should be called on each animation frame. It finds the snow THREE.Points
+ * object by name in the scene, then updates the position of each snow particle based
+ * on its velocity, creating the effect of falling snow. When a snowflake passes the
+ * ground boundary (below yMin), it is wrapped back to the top boundary (yMax) and
+ * assigned a new random x-position, making the snow appear continuous.
+ *
+ * Particle positions are also wrapped around the scene boundaries on the x and z axes.
+ * The geometry is marked to update so Three.js will redraw the updated particles.
  */
 export function updateSnow(){
     const snow = scene.children.find(child => child.name === 'snow');
@@ -1114,65 +1182,78 @@ export function updateSnow(){
         const velocityX = velocityArray[i * 2];
         const velocityY = velocityArray[i * 2 + 1];
         
-        // Update positions
-        positionArray[i * 3] += velocityX;     // x
-        positionArray[i * 3 + 1] -= velocityY; // y (falling down)
-        // z doesn't have velocity in the current setup
+        positionArray[i * 3] += velocityX;
+        positionArray[i * 3 + 1] -= velocityY;
         
-        // Wrap around x boundaries
-        if (positionArray[i * 3] < groundBounds.xMin) {
-            positionArray[i * 3] = groundBounds.xMax;
-        } else if (positionArray[i * 3] > groundBounds.xMax) {
-            positionArray[i * 3] = groundBounds.xMin;
-        }
+        positionArray[i * 3] = wrapBoundary(positionArray[i * 3], groundBounds.xMin, groundBounds.xMax);
         
-        // Wrap around y boundaries (when snow falls below ground, reset to top)
-        if (positionArray[i * 3 + 1] < groundBounds.yMin) {
-            positionArray[i * 3 + 1] = groundBounds.yMax;
-            // Also randomize x position when wrapping to create continuous snowfall
+        const oldY = positionArray[i * 3 + 1];
+        positionArray[i * 3 + 1] = wrapBoundary(positionArray[i * 3 + 1], groundBounds.yMin, groundBounds.yMax);
+        if (oldY !== positionArray[i * 3 + 1] && positionArray[i * 3 + 1] === groundBounds.yMax) {
             positionArray[i * 3] = Math.random() * (groundBounds.xMax - groundBounds.xMin) + groundBounds.xMin;
-        } else if (positionArray[i * 3 + 1] > groundBounds.yMax) {
-            positionArray[i * 3 + 1] = groundBounds.yMin;
         }
         
-        // Wrap around z boundaries
-        if (positionArray[i * 3 + 2] < groundBounds.zMin) {
-            positionArray[i * 3 + 2] = groundBounds.zMax;
-        } else if (positionArray[i * 3 + 2] > groundBounds.zMax) {
-            positionArray[i * 3 + 2] = groundBounds.zMin;
-        }
+        positionArray[i * 3 + 2] = wrapBoundary(positionArray[i * 3 + 2], groundBounds.zMin, groundBounds.zMax);
     }
     
     snow.geometry.attributes.position.needsUpdate = true;
 }
 
+/**
+ * Creates and returns a THREE.MeshPhysicalMaterial configured to simulate the appearance of ice.
+ *
+ * The material uses light blue coloring, partial transparency, and transmission,
+ * with clearcoat and a custom ice texture for extra realism. It is double-sided
+ * to look good from above and below, and is suitable for meshes representing icy surfaces
+ * such as ponds or lakes.
+ * 
+ * @returns {THREE.MeshPhysicalMaterial} The ice material for use in Three.js meshes.
+ */
 function createIceMaterial() {
     return new THREE.MeshPhysicalMaterial({
         color: 0xaaddff,
         metalness: 0.0,
-        roughness: 0.5,       // Higher roughness = more frosted
+        roughness: 0.5,
         transparent: true,
         opacity: 0.4,
         transmission: 0.7,
         thickness: 0.5,
-        clearcoat: 1.0,       // Adds glossy layer
+        clearcoat: 1.0,
         clearcoatRoughness: 0.3,
         side: THREE.DoubleSide,
         map: loadIceTexture()
     });
 }
 
-function createIcyPond(){
+/**
+ * Creates an icy pond mesh and adds it to the scene.
+ *
+ * The pond is a large circular mesh with an ice material, placed slightly below
+ * the ground level to simulate an icy pond in the outdoor scene. The created mesh
+ * is given the name "pond", added to the Three.js scene, and stored in the global
+ * variable `pond` for later reference.
+ *
+ * Geometry:
+ *   - Uses a CircleGeometry with radius 25 and 64 segments for smoothness.
+ *   - Oriented flat on the ground (rotated -90 degrees on the X axis).
+ *   - Positioned at x = -30, y = -2.5.
+ *
+ * Dependencies:
+ *   - Requires a global `scene` object (Three.js Scene).
+ *   - Requires the helper function `createIceMaterial()` to exist and provide a suitable ice-like material.
+ *   - Modifies the global variable `pond`.
+ */
+function createIcyPond() {
     const circle = new THREE.Mesh(
-        new THREE.CircleGeometry(25, 64),  // radius, segments
+        new THREE.CircleGeometry(25, 64),
         createIceMaterial()
     );
-    circle.rotation.x = -Math.PI / 2;  // Make it horizontal
+    circle.rotation.x = -Math.PI / 2;
     circle.position.x = -30;
     circle.position.y = -2.5;
     circle.name = 'pond';
     scene.add(circle);
-    pond = circle; // Store reference for height calculations
+    pond = circle;
 }
 
 function createNorthernLights() {
@@ -2052,7 +2133,6 @@ export async function setupOutdoorScene(){
     //createMoon();
     //await generateClouds();
     await generateElfAtOrigin();
-    //followElf();
     await generateCottage();
     addChristmasLightsToCottage();
     generateSnow();
@@ -2061,7 +2141,6 @@ export async function setupOutdoorScene(){
     makeFireCrackle(campfireGroup);
     await addLogsAroundCampfire();
     await generateSnowmen();
-    //generateTestBoxes();
     await generateTrees();   
     initKeyboardListeners();
     createNorthernLights();
