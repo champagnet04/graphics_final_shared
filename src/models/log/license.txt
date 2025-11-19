@@ -1,0 +1,11 @@
+Model Information:
+* title:	log
+* source:	https://sketchfab.com/3d-models/log-b1dbfb8ff4d84a4cb5094772262e14d7
+* author:	DiegoSaitta.3d (https://sketchfab.com/DiegoSaitta.3d)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "log" (https://sketchfab.com/3d-models/log-b1dbfb8ff4d84a4cb5094772262e14d7) by DiegoSaitta.3d (https://sketchfab.com/DiegoSaitta.3d) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

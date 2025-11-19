@@ -1560,6 +1560,131 @@ async function generateTrees(){
     }
 }
 
+async function loadCampfire(){
+    const loader = new GLTFLoader();
+    try {
+        const gltf = await loader.loadAsync('/models/campfire/scene.gltf');
+        const campfire = gltf.scene.clone();
+        campfire.name = 'campfire';
+        
+        // Enable shadows on the group and all its children
+        campfire.castShadow = true;
+        campfire.receiveShadow = true;
+        campfire.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        
+        return campfire;
+    } catch (error) {
+        console.error('Error details:', error.message, error.stack);
+    }
+    return null;
+}
+
+async function createCampfire(){
+    const campfireGroup = new THREE.Group();
+    campfireGroup.name = 'campfireGroup';
+    
+    const campfireModel = await loadCampfire();
+    if (campfireModel) {
+        // Calculate bounding box to understand model size
+        const box = new THREE.Box3().setFromObject(campfireModel);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        
+        // Scale the model UP since it's very small (0.036 units)
+        // Scale to make it about 1-2 units tall for visibility
+        const targetHeight = 3; // Desired height in world units
+        const scaleFactor = targetHeight / size.y;
+        campfireModel.scale.setScalar(scaleFactor);
+        
+        // Center the model at origin (in case it's offset)
+        campfireModel.position.sub(center);
+        
+        campfireGroup.add(campfireModel);
+        
+        // Position the campfire at ground height
+        const groundHeight = getHeightAt(-75, -3);
+        campfireGroup.position.set(-75, groundHeight, -3);
+        
+    } else {
+        console.warn('Campfire model failed to load');
+    }
+    
+    sceneObjects.push(campfireGroup);
+    scene.add(campfireGroup);
+    return campfireGroup;
+}
+
+async function loadLog(){
+    const loader = new GLTFLoader();
+    try {
+        const gltf = await loader.loadAsync('/models/log/scene.gltf');
+        const log = gltf.scene.clone();
+        log.name = 'log';
+        
+        // Enable shadows on the group and all its children
+        log.castShadow = true;
+        log.receiveShadow = true;
+        log.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+
+        log.scale.setScalar(0.2);
+        
+        return log;
+    } catch (error) {
+        console.error('Error details:', error.message, error.stack);
+    }
+    return null;
+}
+
+async function addLogsAroundCampfire(){
+    const logGroup = new THREE.Group();
+    
+    // Load all logs
+    const log1 = await loadLog();
+    const log2 = await loadLog();
+    const log3 = await loadLog();
+    const log4 = await loadLog();
+    
+    log1.position.set(-80, getHeightAt(-80, -3), -3);
+    log2.position.set(-70, getHeightAt(-70, -3), -3);
+    log3.position.set(-75, getHeightAt(-75, -8), -8);
+    log4.position.set(-75, getHeightAt(-75, 2), 2);
+
+    log1.rotation.y = Math.PI / 2;
+    log2.rotation.y = Math.PI / 2;
+
+    logGroup.add(log1);
+    logGroup.add(log2);
+    logGroup.add(log3);
+    logGroup.add(log4);
+    
+    scene.add(logGroup);
+    sceneObjects.push(logGroup);
+    return logGroup;
+}
+
+function createPath(){
+    //I want to create a path that makes a loop around the scene (outside of the cottage [the path should lead to the frontdoor], around the capfire, and around the pond)
+    //I want it to be made up of a bunch of stones (reuse the same geometry and transform as needed)
+    //generate the needed code below
+    const path = new THREE.Group();
+    for (let i = 0; i < 10; i++) {
+        const stone = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({color: 0x8B4513}));
+        stone.position.set(Math.random() * 10 - 5, 0, Math.random() * 10 - 5);
+        path.add(stone);
+    }
+    scene.add(path);
+}
+
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
@@ -1570,11 +1695,15 @@ export async function setupOutdoorScene(){
     addChristmasLightsToCottage();
     generateSnow();
     createIcyPond();
+    await createCampfire();
+    await addLogsAroundCampfire();
     await generateSnowmen();
     //generateTestBoxes();
-    await generateTrees();
+    await generateTrees();   
     initKeyboardListeners();
     createNorthernLights();
+    //createPath();
+    console.log('Scene setup complete');
     return { scene, camera };
 }
 
