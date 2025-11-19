@@ -735,25 +735,33 @@ async function generateCottage() {
     return cottageGroup;
 }
 
-function getCottage(){
-    // First try to find the cottage group
+/**
+ * Retrieves the cottage mesh from the scene.
+ *
+ * Searches the scene for a group named 'cottageGroup', then looks
+ * for a child mesh named 'cottage' within that group. Returns the
+ * mesh if found, otherwise returns undefined.
+ *
+ * @returns {THREE.Object3D|undefined} The cottage mesh, or undefined if not found.
+ */
+function getCottage() {
     const cottageGroup = scene.children.find(child => child.name === 'cottageGroup');
     if (cottageGroup) {
-        // Find the cottage within the group
         const cottage = cottageGroup.children.find(child => child.name === 'cottage');
         if (cottage) {
             return cottage;
         }
     }
-    // Fallback: try to find cottage directly in scene (for backwards compatibility)
-    const cottage = scene.children.find(child => child.name === 'cottage');
-    if (!cottage) {
-        console.warn('Cottage not found');
-        return null;
-    }
-    return cottage;
 }
 
+/**
+ * Retrieves the group representing the cottage from the scene.
+ *
+ * Searches the scene's immediate children for an Object3D named 'cottageGroup'.
+ * If found, returns the group. If not found, logs a warning and returns null.
+ *
+ * @returns {THREE.Group|null} The cottage group if present, otherwise null.
+ */
 function getCottageGroup(){
     const cottageGroup = scene.children.find(child => child.name === 'cottageGroup');
     if (!cottageGroup) {
@@ -779,10 +787,8 @@ function addEdgeLights(start, end, axis, fixed1, fixed2, baseY, spacing, points,
     for (let v = start; v <= end; v += spacing) {
         let point;
         if (axis === 'x') {
-            // v is x, fixed2 is z
             point = new THREE.Vector3(v, baseY + yOffset, fixed2);
         } else if (axis === 'z') {
-            // fixed1 is x, v is z
             point = new THREE.Vector3(fixed1, baseY + yOffset, v);
         }
         points.push(point);
@@ -797,76 +803,89 @@ function addEdgeLights(start, end, axis, fixed1, fixed2, baseY, spacing, points,
  * @param {Array<THREE.Vector3>} points - Array to push the generated points to
  */
 function addDiagonalLights(startPoint, endPoint, spacing, points) {
-    // Calculate the direction vector and distance
     const direction = new THREE.Vector3().subVectors(endPoint, startPoint);
     const distance = direction.length();
     
-    // Normalize the direction
     direction.normalize();
     
-    // Generate points along the line
     for (let t = 0; t < distance - 0.01; t += spacing) {
         const point = new THREE.Vector3().copy(startPoint);
         point.addScaledVector(direction, t);
         points.push(point);
     }
     
-    // Always include the end point (this allows segments to connect properly)
     points.push(endPoint.clone());
 }
 
+/**
+ * Generates positions for decorative lights to be placed along the edges of a fence structure.
+ *
+ * The function calculates arrays of 3D positions (THREE.Vector3) corresponding to locations
+ * around the perimeter of a rectangular fence, suitable for distributing point lights or similar objects.
+ * 
+ * The positions are created along the front, back, left, and right edges of the fence, with customizable
+ * gaps at certain locations to allow for gates or features, as specified by manual offsets in the call to
+ * addEdgeLights.
+ *
+ * @param {THREE.Vector3} size - The size of the fence (width = x, height = y, depth = z)
+ * @param {THREE.Vector3} center - The center position of the fence in world coordinates
+ * @returns {THREE.Vector3[]} Array of points where lights should be placed along the fence edges
+ */
 function addLightsToFence(size, center){
     const points = [];
-    const spacing = 0.3; // Spacing between lights
+    const spacing = 0.3;
     
-    // Calculate cottage dimensions in world space
     const width = size.x;
-    const height = size.y;
     const depth = size.z;
     
     const baseY = center.y / 2;
     
-    // Front edge
     const frontZ = center.z + depth / 2;
     addEdgeLights(center.x - width / 2, (center.x + width / 2) - 12.3, 'x', null, frontZ - 1.7, baseY, spacing, points);
     addEdgeLights((center.x - width / 2) + 12.8, center.x + width / 2, 'x', null, frontZ - 1.7, baseY, spacing, points);
 
-    // Back edge
     const backZ = center.z - depth / 2;
     addEdgeLights(center.x - width / 2, (center.x + width / 2) - 13, 'x', null, backZ + 1.9, baseY, spacing, points);
     addEdgeLights((center.x - width / 2) + 13.3, center.x + width / 2, 'x', null, backZ + 1.9, baseY, spacing, points);
 
-    // Left edge
     const leftX = center.x - width / 2;
     addEdgeLights((center.z - depth / 2) + 2, (center.z + depth / 2) -2, 'z', leftX, null, baseY, spacing, points);
 
-    // Right edge
     const rightX = center.x + width / 2;
     addEdgeLights((center.z - depth / 2) + 2, (center.z + depth / 2) -2, 'z', rightX, null, baseY, spacing, points);
     
     return points;
 }
 
+/**
+ * Generates positions for decorative lights to be placed along the top "rail" or elevated section of a fence structure.
+ *
+ * This function determines arrays of 3D positions (THREE.Vector3) for placing lights along the upper edge of a fence.
+ * The lights are distributed along the front, left, and right upper edges of the fence, offset both laterally and vertically
+ * to create a visually appealing line of lights above the main fence structure.
+ *
+ * The spacing and edge offsets are fine-tuned to skip certain sections (such as openings, posts, or gates),
+ * and to maintain consistent elevation and distribution of the lights along the topmost rails.
+ *
+ * @param {THREE.Vector3} size - The overall size of the fence (width = x, height = y, depth = z)
+ * @param {THREE.Vector3} center - The center position of the fence in world coordinates
+ * @returns {THREE.Vector3[]} Array of points along the top fence sections for attaching lights
+ */
 function addLightsToTopFence(size, center){
     const points = [];
-    const spacing = 0.3; // Spacing between lights
+    const spacing = 0.3;
     
-    // Calculate cottage dimensions in world space
     const width = size.x;
-    const height = size.y;
     const depth = size.z;
     
     const baseY = center.y / 2;
 
-    //Front edge
     const frontZ = center.z + depth / 2;
     addEdgeLights((center.x - width / 2) + 5.25, (center.x + width / 2) - 5, 'x', null, frontZ - 1.7, baseY + 5.25, spacing, points);
 
-    //left edge
     const leftX = center.x - width / 2;
     addEdgeLights((center.z - depth / 2) + 14, (center.z + depth / 2) - 2, 'z', leftX + 5.3, null, baseY + 5.25, spacing, points);
 
-    //right edge
     const rightX = center.x + width / 2;
     addEdgeLights((center.z - depth / 2) + 14, (center.z + depth / 2) -2, 'z', rightX - 5, null, baseY + 5.25, spacing, points);
 
