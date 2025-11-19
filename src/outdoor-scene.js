@@ -591,46 +591,56 @@ function getHeightAt(x, z){
     return groundHeight;
 }
 
-// Initialize keyboard listeners once
-function initKeyboardListeners(){
+/**
+ * Normalizes a keyboard event key to a consistent format.
+ * Converts arrow keys (ArrowUp, ArrowDown, etc.) to lowercase format (arrowup, arrowdown, etc.)
+ * and converts other keys to lowercase.
+ * 
+ * @param {string} key - The key from the keyboard event (e.key)
+ * @returns {string} Normalized key string
+ */
+function normalizeKey(key) {
+    if (key.startsWith('Arrow')) {
+        return 'arrow' + key.slice(5).toLowerCase();
+    }
+    return key.toLowerCase();
+}
+
+/**
+ * Checks if a key is one of the tracked movement/control keys.
+ * 
+ * @param {string} key - The normalized key string
+ * @returns {boolean} True if the key is tracked, false otherwise
+ */
+function isTrackedKey(key) {
+    const trackedKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+    return trackedKeys.includes(key);
+}
+
+/**
+ * Initializes keyboard event listeners to track movement and control key presses.
+ * 
+ * This function adds 'keydown' and 'keyup' event listeners to the window. 
+ * When a tracked key (W, A, S, D, or arrow keys) is pressed or released,
+ * it updates the corresponding entry in the `keysPressed` object to reflect 
+ * the current state (true for pressed, false for released). It also prevents 
+ * the default browser behavior for these keys to avoid unintended scrolling 
+ * or other side effects.
+ */
+function initKeyboardListeners() {
     window.addEventListener('keydown', (e) => {
-        let key = e.key.toLowerCase();
-        // Handle arrow keys
-        if (e.key.startsWith('Arrow')) {
-            key = 'arrow' + e.key.slice(5).toLowerCase(); // 'ArrowUp' -> 'arrowup'
-        }
-        switch (key) {
-            case 'w':
-            case 'a':
-            case 's':
-            case 'd':
-            case 'arrowup':
-            case 'arrowdown':
-            case 'arrowleft':
-            case 'arrowright':
-                keysPressed[key] = true;
-                e.preventDefault(); // Prevent default behavior
-                break;
+        const key = normalizeKey(e.key);
+        if (isTrackedKey(key)) {
+            keysPressed[key] = true;
+            e.preventDefault();
         }
     });
+    
     window.addEventListener('keyup', (e) => {
-        let key = e.key.toLowerCase();
-        // Handle arrow keys
-        if (e.key.startsWith('Arrow')) {
-            key = 'arrow' + e.key.slice(5).toLowerCase(); // 'ArrowUp' -> 'arrowup'
-        }
-        switch (key) {
-            case 'w':
-            case 'a':
-            case 's':
-            case 'd':
-            case 'arrowup':
-            case 'arrowdown':
-            case 'arrowleft':
-            case 'arrowright':
-                keysPressed[key] = false;
-                e.preventDefault(); // Prevent default behavior
-                break;
+        const key = normalizeKey(e.key);
+        if (isTrackedKey(key)) {
+            keysPressed[key] = false;
+            e.preventDefault();
         }
     });
 }
