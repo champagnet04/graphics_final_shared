@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { setupOutdoorScene } from './outdoor-scene.js';
-import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity, makeSnowmanSpeak, pickUpSnowball } from './outdoor-scene.js';
+import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity, makeSnowmanSpeak, pickUpSnowball, updateSnowballThrow, throwSnowball, hasSnowballInHand } from './outdoor-scene.js';
 
 // Initialize the scene asynchronously
 async function init() {
@@ -38,7 +38,7 @@ async function init() {
         return false;
     }
     
-    function checkIfSnowman(intersects) {
+    function checkIfSnowman(intersects, event) {
         for (const intersect of intersects) {
             let obj = intersect.object;
             while (obj) {
@@ -48,7 +48,12 @@ async function init() {
                         part.geometry && 
                         part.geometry.type === 'SphereGeometry'
                     )) {
-                        makeSnowmanSpeak();
+                        // If snowball is in hand, throw it instead of making snowman speak
+                        if (hasSnowballInHand()) {
+                            throwSnowball(event.clientX, event.clientY);
+                        } else {
+                            makeSnowmanSpeak();
+                        }
                         return true;
                     }
                 }
@@ -66,9 +71,18 @@ async function init() {
         
         const allIntersects = raycaster.intersectObjects(scene.children, true);
         
-        checkIfSnowballPile(allIntersects);
+        // Check for snowball pile click first
+        if (checkIfSnowballPile(allIntersects)) {
+            return;
+        }
         
-        checkIfSnowman(allIntersects);
+        // Check for snowman click
+        if (checkIfSnowman(allIntersects, event)) {
+            return;
+        }
+        
+        // Otherwise, throw snowball if one exists
+        throwSnowball(event.clientX, event.clientY);
     }
     
     renderer.domElement.addEventListener('click', onMouseClick);
@@ -87,6 +101,7 @@ async function init() {
         followElf();
         checkCampfireProximity();
         updateSnow();
+        updateSnowballThrow();
         if (northernLights) {
             northernLights.material.uniforms.time.value += 0.01;
         }

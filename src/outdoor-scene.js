@@ -33,6 +33,7 @@ let sceneObjects = [];
 let audioListener = null;
 let fireCrackleSound = null;
 const keysPressed = {};
+let snowballThrowAnimation = null; // { snowball, path, impactT, currentT, speed }
 
 const groundBounds = {
     xMin: -100,
@@ -2785,10 +2786,89 @@ function createSnowballPile() {
     scene.add(snowballPile);
 }
 
-export function pickUpSnowball(){
-    console.log('pickUpSnowball');
+/**
+ * Checks if the elf currently has a snowball in hand.
+ * 
+ * @returns {boolean} True if a snowball is found in hand, false otherwise.
+ */
+export function hasSnowballInHand(){
+    // Ensure elf and elfGroup are available
+    if (!elf) {
+        elf = scene.children.find(child => child.name === 'elf');
+        if (!elf) {
+            scene.traverse((child) => {
+                if (child.name === 'elf') {
+                    elf = child;
+                }
+            });
+        }
+    }
+    if (!elf) {
+        return false;
+    }
     
-    if (!elfGroup || elfGroup.children.length === 0) {
+    // Get the elfGroup (parent of elf, or use global if available)
+    if (!elfGroup) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) {
+        return false;
+    }
+    
+    // Check in elfGroup first (where it should be when held)
+    const snowball = elfGroup.children.find(child => child.name === 'snowballInHand');
+    if (snowball) {
+        return true;
+    }
+    
+    // Also check if there's a snowball in the scene (from a previous incomplete throw)
+    let foundInScene = false;
+    scene.traverse((child) => {
+        if (child.name === 'snowballInHand' && child.parent === scene) {
+            foundInScene = true;
+        }
+    });
+    
+    return foundInScene;
+}
+
+/**
+ * Adds a snowball mesh to the elf character's hand (held position).
+ *
+ * This function ensures the elf character (as represented by elfGroup) is valid.
+ * If a snowball is already present in the elf's hand, it will be removed first,
+ * then a new snowball mesh is created, named 'snowballInHand', and added as a child
+ * of elfGroup. The function also sets up shadow casting/receiving properties for realism.
+ * The snowball's position is set relative to elfGroup to approximate a hand-held location.
+ *
+ * If elfGroup is not found, the function logs a warning and returns null.
+ * Otherwise, the function returns nothing.
+ *
+ * Typical usage: call this function to make the elf "pick up" a new snowball,
+ * either on interaction or before a snowball throw action.
+ *
+ * @export
+ * @function pickUpSnowball
+ */
+export function pickUpSnowball(){
+    // Ensure elf is available
+    if (!elf) {
+        elf = scene.children.find(child => child.name === 'elf');
+        if (!elf) {
+            scene.traverse((child) => {
+                if (child.name === 'elf') {
+                    elf = child;
+                }
+            });
+        }
+    }
+    if (!elf) {
+        console.warn('Elf not found, cannot pick up snowball');
+        return null;
+    }
+    
+    // Get the elfGroup (parent of elf, or use global if available)
+    if (!elfGroup) {
         elfGroup = elf.parent;
     }
     if (!elfGroup) {
@@ -2811,9 +2891,267 @@ export function pickUpSnowball(){
     elfGroup.add(snowball);    
 }
 
-function throwSnowball(){
-    //when you click on any object/location, the snowball is thrown along that line (maybe with some physics so it fall towards the ground)
-    //when the snowball hits the ground it morphs into a splat shape & make a sound effect
+function createThrowPath(mouseX, mouseY){
+    //create a straight line path from the snowball's current position to the mouse cursor position
+    // Ensure elfGroup is available
+    if (!elfGroup) {
+        if (!elf) {
+            elf = scene.children.find(child => child.name === 'elf');
+            if (!elf) {
+                scene.traverse((child) => {
+                    if (child.name === 'elf') {
+                        elf = child;
+                    }
+                });
+            }
+        }
+        if (elf) {
+            elfGroup = elf.parent;
+        }
+    }
+    if (!elfGroup) {
+        console.warn('ElfGroup not found, cannot create throw path');
+        return null;
+    }
+    
+    // First check in elfGroup (where it should be when held)
+    let snowball = elfGroup.children.find(child => child.name === 'snowballInHand');
+    
+    // If not found, check if it's in the scene (from a previous incomplete throw)
+    if (!snowball) {
+        scene.traverse((child) => {
+            if (child.name === 'snowballInHand' && child.parent === scene) {
+                snowball = child;
+            }
+        });
+    }
+    
+    if (!snowball) {
+        console.warn('Snowball not found, cannot create throw path');
+        return null;
+    }
+    
+    // Get snowball's world position
+    const snowballWorldPos = new THREE.Vector3();
+    snowball.getWorldPosition(snowballWorldPos);
+    
+    // Convert mouse coordinates to normalized device coordinates
+    const mouse = new THREE.Vector2();
+    mouse.x = (mouseX / window.innerWidth) * 2 - 1;
+    mouse.y = -(mouseY / window.innerHeight) * 2 + 1;
+    
+    // Raycast from camera to find 3D position at mouse click
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    
+    // Intersect with ground to get target position
+    const intersects = raycaster.intersectObject(ground, false);
+    let targetPos;
+    
+    if (intersects.length > 0) {
+        // Use intersection point with ground
+        targetPos = intersects[0].point;
+    } else {
+        // If no intersection, project to a far distance
+        const farPoint = new THREE.Vector3();
+        raycaster.ray.at(100, farPoint);
+        targetPos = farPoint;
+    }
+    
+    // Create line curve from snowball position to target position
+    const path = new THREE.LineCurve3(snowballWorldPos, targetPos);
+    return path;
+}
+
+export function throwSnowball(x, y){
+    // Don't allow new throw if one is already in progress
+    if (snowballThrowAnimation) {
+        return;
+    }
+    
+    // Ensure elf and elfGroup are available
+    if (!elf) {
+        elf = scene.children.find(child => child.name === 'elf');
+        // If not found in scene, might be in a group - search recursively
+        if (!elf) {
+            scene.traverse((child) => {
+                if (child.name === 'elf') {
+                    elf = child;
+                }
+            });
+        }
+    }
+    if (!elf) {
+        console.warn('Elf not found, cannot throw snowball');
+        return;
+    }
+    
+    // Get the elfGroup (parent of elf, or use global if available)
+    if (!elfGroup) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) {
+        console.warn('ElfGroup not found, cannot throw snowball');
+        return;
+    }
+    
+    // First check in elfGroup (where it should be when held)
+    let snowball = elfGroup.children.find(child => child.name === 'snowballInHand');
+    
+    // If not found, check if it's in the scene (from a previous incomplete throw)
+    if (!snowball) {
+        scene.traverse((child) => {
+            if (child.name === 'snowballInHand' && child.parent === scene) {
+                snowball = child;
+            }
+        });
+    }
+    
+    if (!snowball) {
+        console.warn('No snowball in hand to throw');
+        return;
+    }
+    
+    const path = createThrowPath(x, y);
+    if (!path) {
+        return;
+    }
+    
+    const hitResult = checkSnowballHit(path);
+    if (!hitResult) {
+        return;
+    }
+    
+    // Ensure impactT is at least a minimum value to allow visible animation
+    // This ensures the snowball animates for at least a few frames
+    const minImpactT = 0.15; // Minimum 15% of path (about 7-8 frames at speed 0.02)
+    const impactT = Math.max(hitResult.t, minImpactT);
+    
+    // Get snowball's current world position as starting point
+    const startPos = new THREE.Vector3();
+    snowball.getWorldPosition(startPos);
+    
+    // Store original parent in case we need to restore
+    const originalParent = snowball.parent;
+    
+    // Remove snowball from current parent and add to scene for independent movement
+    if (snowball.parent) {
+        snowball.parent.remove(snowball);
+    }
+    scene.add(snowball);
+    snowball.position.copy(startPos);
+    
+    // Set up animation state
+    snowballThrowAnimation = {
+        snowball: snowball,
+        path: path,
+        impactT: impactT,
+        currentT: 0,
+        speed: 0.02, // How fast to move along the path (t value per frame)
+        originalParent: originalParent // Store in case we need to restore
+    };
+}
+
+/**
+ * Updates the snowball throw animation, moving the snowball along the path.
+ * 
+ * This function should be called every frame in the animate loop. It moves the snowball
+ * along the throw path until it reaches the impact point, then calls morphSnowballIntoSplat()
+ * and makeSplatSound().
+ * 
+ * @export
+ * @function updateSnowballThrow
+ */
+export function updateSnowballThrow(){
+    if (!snowballThrowAnimation) {
+        return;
+    }
+    
+    const { snowball, path, impactT, speed } = snowballThrowAnimation;
+    
+    // Update current position along path
+    snowballThrowAnimation.currentT += speed;
+    
+    // Clamp to impact point
+    if (snowballThrowAnimation.currentT >= impactT) {
+        snowballThrowAnimation.currentT = impactT;
+    }
+    
+    // Get position along path at current t
+    const currentPoint = path.getPoint(snowballThrowAnimation.currentT);
+    snowball.position.copy(currentPoint);
+    
+    // Check if reached impact point
+    if (snowballThrowAnimation.currentT >= impactT) {
+        // Animation complete - morph and play sound
+        morphSnowballIntoSplat();
+        makeSplatSound();
+        
+        // Remove snowball from scene
+        if (snowball && snowball.parent) {
+            snowball.parent.remove(snowball);
+        }
+        
+        // Clear animation state
+        snowballThrowAnimation = null;
+    }
+}
+
+function checkSnowballHit(path){
+    if (!path) {
+        return null;
+    }
+    
+    const raycaster = new THREE.Raycaster();
+    const sampleCount = 100; // Number of points to sample along the path
+    const snowballRadius = 0.3;
+    
+    // Get all objects to check for collisions (filter out position data, keep only 3D objects)
+    const objectsToCheck = sceneObjects.filter(obj => obj instanceof THREE.Object3D);
+    if (ground) {
+        objectsToCheck.push(ground);
+    }
+    
+    // Sample points along the path
+    // Skip the first few samples to avoid immediate ground hits at the start
+    const skipInitialSamples = 5; // Skip first 5% of the path to allow animation to start
+    
+    for (let i = 0; i <= sampleCount; i++) {
+        const t = i / sampleCount;
+        const currentPoint = path.getPoint(t);
+        const nextPoint = i < sampleCount ? path.getPoint((i + 1) / sampleCount) : currentPoint;
+        
+        // Create ray from current point to next point
+        const direction = new THREE.Vector3().subVectors(nextPoint, currentPoint);
+        const distance = direction.length();
+        
+        if (distance > 0) {
+            direction.normalize();
+            raycaster.set(currentPoint, direction);
+            
+            // Check for intersections with scene objects and ground
+            const intersects = raycaster.intersectObjects(objectsToCheck, true);
+            
+            if (intersects.length > 0) {
+                // Found a hit - return the hit position and t value
+                const hitPoint = intersects[0].point;
+                return { point: hitPoint, t: t };
+            }
+        }
+        
+        // Also check if point is below ground level (but skip initial samples)
+        if (i >= skipInitialSamples) {
+            const groundHeight = getHeightAt(currentPoint.x, currentPoint.z);
+            if (currentPoint.y <= groundHeight + snowballRadius) {
+                // Hit the ground
+                const hitPoint = new THREE.Vector3(currentPoint.x, groundHeight + snowballRadius, currentPoint.z);
+                return { point: hitPoint, t: t };
+            }
+        }
+    }
+    
+    // No hit found - return the end of the path
+    return { point: path.getPoint(1), t: 1 };
 }
 
 function morphSnowballIntoSplat(){
