@@ -7,6 +7,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 //it is incredibly important that we break down EVERYTHING into as many smaller functions as possible
 const scene = createScene();
 const camera = setupCamera();
+let cameraPitch = 0;
 
 // Store references to ground, pond, and elf for later use
 let ground = null;
@@ -315,9 +316,6 @@ async function generateElfAtOrigin(){
         console.error('Cant load model:', error);
     }
 }
-
-// Track camera pitch for looking up/down
-let cameraPitch = 0;
 
 export function moveElf(){
     if (!elf) {
@@ -998,25 +996,13 @@ function createIcyPond(){
 }
 
 function createNorthernLights() {
-    // Create a wide, curved geometry for the aurora
-    const width = 3000;  // Very wide to span the horizon
-    const height = 1000;  // Height of the aurora curtain
-    const geometry = new THREE.PlaneGeometry(width, height, 64, 32);
+    // Create a half dome (hemisphere) geometry
+    const radius = 2000;  // Large radius to cover the whole sky
+    const widthSegments = 64;  // Horizontal segments
+    const heightSegments = 32;  // Vertical segments
+    const geometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments, 0, Math.PI * 2, 0, Math.PI / 2);
     
-    // Curve the geometry to follow the sky dome
-    const positions = geometry.attributes.position.array;
-    for (let i = 0; i < positions.length; i += 3) {
-        const x = positions[i];
-        const y = positions[i + 1];
-        
-        // Curve it backward (away from viewer)
-        const curveFactor = 0.0003;
-        positions[i + 2] = -Math.abs(x) * curveFactor * 100;
-        
-        // Also curve it upward slightly
-        positions[i + 1] = y + Math.abs(x) * 0.05;
-    }
-    
+    // The geometry is already a hemisphere (top half of sphere)
     geometry.computeVertexNormals();
     
     // STEP 2: Create the Shader Material
@@ -1062,8 +1048,12 @@ function createNorthernLights() {
                 // Combine waves for complex pattern
                 float pattern = wave1 * 0.5 + wave2 * 0.3 + wave3 * 0.2;
                 
-                // Fade out at edges (top and bottom)
-                float verticalFade = smoothstep(0.0, 0.3, vUv.y) * smoothstep(1.0, 0.7, vUv.y);
+                // Fade out at top (zenith) - keep it visible at the top
+                float topFade = smoothstep(0.0, 0.2, vUv.y);
+                
+                // Fade out at bottom (horizon) - make it fade more aggressively so midnight color shows
+                // vUv.y goes from 0 (bottom/horizon) to 1 (top/zenith) for a hemisphere
+                float bottomFade = smoothstep(0.0, 0.5, vUv.y); // Fade from 0 to 0.5, so bottom half fades out
                 
                 // Fade out at horizontal edges
                 float horizontalFade = smoothstep(0.0, 0.2, vUv.x) * smoothstep(1.0, 0.8, vUv.x);
@@ -1072,8 +1062,8 @@ function createNorthernLights() {
                 vec3 finalColor = mix(color1, color2, pattern);
                 finalColor = mix(finalColor, color3, wave3);
                 
-                // Calculate opacity with fading
-                float opacity = pattern * verticalFade * horizontalFade * 0.6;
+                // Calculate opacity with fading - stronger fade at bottom to show midnight color
+                float opacity = pattern * topFade * bottomFade * horizontalFade * 0.6;
                 
                 gl_FragColor = vec4(finalColor, opacity);
             }
@@ -1086,9 +1076,10 @@ function createNorthernLights() {
     
     const aurora = new THREE.Mesh(geometry, material);
     
-    // STEP 3: Position the aurora in the sky
-    aurora.position.set(0, 600, -1000); // Far back, high up
-    aurora.rotation.x = Math.PI / 6; // Tilt downward slightly
+    // Position the hemisphere so its bottom edge is at ground level (y=0)
+    // The hemisphere is the top half of a sphere, so position it at y=0
+    // This makes the bottom edge of the hemisphere at y=0 (ground level)
+    aurora.position.set(0, 0, 0);
     
     northernLights = aurora;
     scene.add(northernLights);
