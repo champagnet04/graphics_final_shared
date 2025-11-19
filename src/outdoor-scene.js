@@ -11,6 +11,7 @@ let cameraPitch = 0;
 let ground = null;
 let pond = null;
 let elf = null;
+let elfGroup = new THREE.Group();
 export let northernLights = null;
 let snowmanGroup = null;
 let campfireGroup = null;
@@ -143,21 +144,28 @@ export function followElf(){
         return;
     }
     
+    if (!elfGroup || elfGroup.children.length === 0) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) {
+        return;
+    }
+    
     const cameraDistance = 8;
     const cameraHeight = 5;
     
-    const facingAngle = elf.rotation.y;
+    const facingAngle = elfGroup.rotation.y;
     
-    const cameraX = elf.position.x - Math.sin(facingAngle) * cameraDistance;
-    const cameraZ = elf.position.z - Math.cos(facingAngle) * cameraDistance;
-    const cameraY = elf.position.y + cameraHeight;
+    const cameraX = elfGroup.position.x - Math.sin(facingAngle) * cameraDistance;
+    const cameraZ = elfGroup.position.z - Math.cos(facingAngle) * cameraDistance;
+    const cameraY = elfGroup.position.y + cameraHeight;
     
     camera.position.set(cameraX, cameraY, cameraZ);
     
     const lookAheadDistance = 3;
-    const lookX = elf.position.x + Math.sin(facingAngle) * lookAheadDistance;
-    const lookZ = elf.position.z + Math.cos(facingAngle) * lookAheadDistance;
-    const baseLookY = elf.position.y + 1;
+    const lookX = elfGroup.position.x + Math.sin(facingAngle) * lookAheadDistance;
+    const lookZ = elfGroup.position.z + Math.cos(facingAngle) * lookAheadDistance;
+    const baseLookY = elfGroup.position.y + 1;
     
     const pitchOffset = Math.sin(cameraPitch) * 5;
     const lookY = baseLookY + pitchOffset;
@@ -424,7 +432,9 @@ async function generateElfAtOrigin(){
         elf.position.set(0, 0, 0);
         elf.scale.setScalar(0.04);
         
-        scene.add(elf);
+        elfGroup.add(elf);
+        scene.add(elfGroup);
+
         return elf;
     } catch (error) {
         console.error('Cant load model:', error);
@@ -456,15 +466,22 @@ export function moveElf(){
     }
     if (!elf) return;
     
+    // Get the elfGroup (parent of elf)
+    if (!elfGroup || elfGroup.children.length === 0) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) return;
+    
     if (!keysPressed['arrowup'] && !keysPressed['arrowdown'] && 
         !keysPressed['arrowleft'] && !keysPressed['arrowright']) {
-        elf.position.y = getHeightAt(elf.position.x, elf.position.z);
+        elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
         return;
     }
     
     const moveSpeed = 0.3;
     
-    const elfRotation = elf.rotation.y;
+    // Use elfGroup's rotation for movement direction
+    const elfRotation = elfGroup.rotation.y;
     
     const forward = new THREE.Vector3(
         Math.sin(elfRotation),
@@ -479,20 +496,20 @@ export function moveElf(){
     );
     
     if (keysPressed['arrowup']) {
-        elf.position.x += forward.x * moveSpeed;
-        elf.position.z += forward.z * moveSpeed;
+        elfGroup.position.x += forward.x * moveSpeed;
+        elfGroup.position.z += forward.z * moveSpeed;
     } else if (keysPressed['arrowdown']) {
-        elf.position.x -= forward.x * moveSpeed;
-        elf.position.z -= forward.z * moveSpeed;
+        elfGroup.position.x -= forward.x * moveSpeed;
+        elfGroup.position.z -= forward.z * moveSpeed;
     } else if (keysPressed['arrowleft']) {
-        elf.position.x += right.x * moveSpeed;
-        elf.position.z += right.z * moveSpeed;
+        elfGroup.position.x += right.x * moveSpeed;
+        elfGroup.position.z += right.z * moveSpeed;
     } else if (keysPressed['arrowright']) {
-        elf.position.x -= right.x * moveSpeed;
-        elf.position.z -= right.z * moveSpeed;
+        elfGroup.position.x -= right.x * moveSpeed;
+        elfGroup.position.z -= right.z * moveSpeed;
     }
     
-    elf.position.y = getHeightAt(elf.position.x, elf.position.z);
+    elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
 }
 
 /**
@@ -528,10 +545,10 @@ export function lookAround(){
 
     const turnSpeed = 0.05;
     if (keysPressed['a']) {
-        elf.rotation.y += turnSpeed;
+        elfGroup.rotation.y += turnSpeed;
     }
     if (keysPressed['d']) {
-        elf.rotation.y -= turnSpeed;
+        elfGroup.rotation.y -= turnSpeed;
     }
     
     const lookSpeed = 0.02;
@@ -2770,20 +2787,18 @@ function createSnowballPile() {
 
 export function pickUpSnowball(){
     console.log('pickUpSnowball');
-    //when you click the snowballPile, a snowball generates in you hand
-    if (!elf) {
-        elf = scene.children.find(child => child.name === 'elf');
-    }
     
-    if (!elf) {
-        console.warn('Elf not found, cannot pick up snowball');
+    if (!elfGroup || elfGroup.children.length === 0) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) {
+        console.warn('ElfGroup not found, cannot pick up snowball');
         return null;
     }
     
-    // Remove any existing snowball in hand
-    const existingSnowball = elf.children.find(child => child.name === 'snowballInHand');
+    const existingSnowball = elfGroup.children.find(child => child.name === 'snowballInHand');
     if (existingSnowball) {
-        elf.remove(existingSnowball);
+        elfGroup.remove(existingSnowball);
     }
     
     const snowball = createSnowball();
@@ -2791,38 +2806,9 @@ export function pickUpSnowball(){
     snowball.castShadow = true;
     snowball.receiveShadow = true;
     
-    // Make snowball bigger so it's more visible
-    snowball.scale.setScalar(2);
+    snowball.position.set(-2, 1.5, 1.0);
     
-    // Calculate world position for snowball based on elf's position and rotation
-    const handOffset = 1.5; // Height offset for hand position
-    const forwardOffset = 1.0; // Distance in front of elf
-    const sideOffset = 0.5; // Slight offset to the right
-    
-    // Calculate position based on elf's rotation
-    const elfRotation = elf.rotation.y;
-    const forwardX = Math.sin(elfRotation) * forwardOffset;
-    const forwardZ = Math.cos(elfRotation) * forwardOffset;
-    const rightX = Math.sin(elfRotation + Math.PI / 2) * sideOffset;
-    const rightZ = Math.cos(elfRotation + Math.PI / 2) * sideOffset;
-    
-    // World position relative to elf
-    const worldX = elf.position.x + forwardX + rightX;
-    const worldY = elf.position.y + handOffset;
-    const worldZ = elf.position.z + forwardZ + rightZ;
-    
-    // Set world position
-    snowball.position.set(worldX, worldY, worldZ);
-    
-    // Add snowball to scene first to test visibility
-    scene.add(snowball);
-    
-    console.log('Snowball added to scene at world position:', snowball.position);
-    console.log('Elf world position:', elf.position);
-    console.log('Elf rotation:', elf.rotation.y);
-    console.log('Snowball scale:', snowball.scale);
-    
-    return snowball;
+    elfGroup.add(snowball);    
 }
 
 function throwSnowball(){
