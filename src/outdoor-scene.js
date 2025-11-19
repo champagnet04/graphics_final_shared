@@ -21,6 +21,11 @@ const snowMaterial = new THREE.MeshStandardMaterial({
     map: loadSnowTexture()
 });
 
+const treeMaterial = new THREE.MeshStandardMaterial({
+    color: 0x023020,
+    side: THREE.DoubleSide
+});
+
 let sceneObjects = [];
 let audioListener = null;
 let fireCrackleSound = null;
@@ -1367,64 +1372,108 @@ function createNorthernLights() {
     scene.add(northernLights);
 }
 
+/**
+ * Loads and returns a repeating ice texture.
+ * 
+ * This function creates a new THREE.TextureLoader to load the ice texture from '/textures/ice.png'.
+ * After loading, the texture's wrapping mode is set to RepeatWrapping on both S and T axes,
+ * and the repeat is set to (10, 10) to allow the texture to tile seamlessly over larger surfaces.
+ * 
+ * If there is an error loading the texture, an error is logged to the console.
+ * 
+ * @returns {THREE.Texture} The loaded and configured ice texture.
+ */
 function loadIceTexture(){
     const loader = new THREE.TextureLoader();
     const iceTexture = loader.load(
         '/textures/ice.png',
-        // onLoad callback
         (texture) => {
-            // Configure texture wrapping and repeat for tiling
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.RepeatWrapping;
-            // Repeat the texture across the ground (adjust these values to control tile size)
-            texture.repeat.set(10, 10); // Repeat 10 times in each direction
+            texture.repeat.set(10, 10);
         },
-        // onProgress callback (optional)
         undefined,
-        // onError callback
         (error) => {
             console.error('Error loading ice texture:', error);
         }
     );
-    
-    // Set wrapping and repeat immediately (in case texture loads synchronously)
-    // iceTexture.wrapS = THREE.RepeatWrapping;
-    // iceTexture.wrapT = THREE.RepeatWrapping;
-    // iceTexture.repeat.set(10, 10);
-    
+        
     return iceTexture;
 }
 
+/**
+ * Creates the bottom sphere of the snowman.
+ *
+ * This function constructs the bottom part of the snowman using a sphere geometry
+ * with a radius of 2 units, applying the globally defined `snowMaterial`. The
+ * sphere is positioned at (0, 1, 0) relative to its parent group, with the group
+ * expected to be placed at ground level—thus positioning the bottom of the sphere
+ * just above the ground. Shadows are enabled on this mesh so that the snowman
+ * can cast and receive shadows in the scene.
+ *
+ * @returns {THREE.Mesh} The mesh representing the snowman's bottom sphere.
+ */
 function createSnowmanBottom() {
     const snowmanGeometry = new THREE.SphereGeometry(2, 32, 32);
     const snowmanBottom = new THREE.Mesh(snowmanGeometry, snowMaterial);
-    // Position relative to group (group will be at ground level)
-    snowmanBottom.position.set(0, 1, 0); // 1 unit above group base
+    snowmanBottom.position.set(0, 1, 0);
     snowmanBottom.castShadow = true;
     snowmanBottom.receiveShadow = true;
     return snowmanBottom;
 }
 
+/**
+ * Creates the middle sphere of the snowman.
+ *
+ * This function constructs the middle part of the snowman using a sphere geometry
+ * with a radius of 1.5 units, applying the globally defined `snowMaterial`. The
+ * sphere is positioned at (0, 3, 0) relative to its parent group, so that it sits
+ * above the bottom sphere when assembling a full snowman. Shadows are enabled on
+ * this mesh so that the snowman can cast and receive shadows in the scene.
+ *
+ * @returns {THREE.Mesh} The mesh representing the snowman's middle sphere.
+ */
 function createSnowmanMiddle(){
     const snowmanGeometry = new THREE.SphereGeometry(1.5, 32, 32);
     const snowmanMiddle = new THREE.Mesh(snowmanGeometry, snowMaterial);
-    // Position relative to group
-    snowmanMiddle.position.set(0, 3, 0); // 3 units above group base
+    snowmanMiddle.position.set(0, 3, 0);
     snowmanMiddle.castShadow = true;
     snowmanMiddle.receiveShadow = true;
     return snowmanMiddle;
 }
 
+/**
+ * Creates the top sphere of the snowman.
+ *
+ * This function constructs the top part of the snowman using a sphere geometry
+ * with a radius of 1 unit, applying the globally defined `snowMaterial`. The
+ * sphere is positioned at (0, 5, 0) relative to its parent group, so that it
+ * sits above the bottom and middle spheres when assembling a full snowman.
+ * Shadows are enabled on this mesh so that the snowman can cast and receive
+ * shadows in the scene.
+ *
+ * @returns {THREE.Mesh} The mesh representing the snowman's top sphere.
+ */
 function createSnowmanTop(){
     const snowmanGeometry = new THREE.SphereGeometry(1, 32, 32);
     const snowmanTop = new THREE.Mesh(snowmanGeometry, snowMaterial);
-    // Position relative to group
-    snowmanTop.position.set(0, 5, 0); // 5 units above group base
+    snowmanTop.position.set(0, 5, 0);
     snowmanTop.castShadow = true;
     snowmanTop.receiveShadow = true;
     return snowmanTop;
 }
 
+/**
+ * Creates the hat for the snowman.
+ *
+ * This function creates a snowman hat as a THREE.Group consisting of two parts:
+ * the hat bottom (a short wide cylinder) and the hat top (a taller, narrower cylinder).
+ * Both parts are created using their respective helper functions and positioned
+ * to rest atop the snowman's head when the full snowman is assembled.
+ * Shadows are enabled on the entire hat group so that it can cast and receive shadows in the scene.
+ *
+ * @returns {THREE.Group} The group representing the snowman's hat, ready to be added to the snowman or scene.
+ */
 function createSnowmanHat(){
     const snowmanHat = new THREE.Group();
     snowmanHat.add(createSnowmanHatBottom());
@@ -1435,6 +1484,17 @@ function createSnowmanHat(){
     return snowmanHat;
 }
 
+/**
+ * Creates the bottom part of the snowman's hat.
+ *
+ * This function constructs the bottom part of a snowman's hat using a cylinder geometry
+ * with a radius of 1 unit and a height of 0.2 units. The mesh is created with a black
+ * standard material and double-sided faces to ensure it renders correctly in the scene.
+ * The hat bottom is positioned at (0, 6, 0) so that it sits atop the snowman's head,
+ * and both cast and receive shadows, enabling realistic lighting effects.
+ *
+ * @returns {THREE.Mesh} The mesh representing the bottom of the snowman's hat.
+ */
 function createSnowmanHatBottom(){
     const hatGeometry = new THREE.CylinderGeometry(1, 1, 0.2, 32);
     const hatMaterial = new THREE.MeshStandardMaterial({
@@ -1448,6 +1508,18 @@ function createSnowmanHatBottom(){
     return snowmanHatBottom;
 }
 
+/**
+ * Creates the top part of the snowman's hat.
+ *
+ * This function constructs the top part of a snowman's hat using a cylinder geometry
+ * with a radius of 0.75 units and a height of 1 unit. The mesh uses a black
+ * standard material with double-sided faces for proper rendering from all angles.
+ * The top hat section is positioned at (0, 6.5, 0) so that it sits neatly above
+ * the bottom part of the hat and atop the snowman's head when assembled.
+ * Shadows are enabled to allow the hat top to cast and receive realistic lighting.
+ *
+ * @returns {THREE.Mesh} The mesh representing the top cylinder of the snowman's hat.
+ */
 function createSnowmanHatTop(){
     const hatGeometry = new THREE.CylinderGeometry(0.75, 0.75, 1, 32);
     const hatMaterial = new THREE.MeshStandardMaterial({
@@ -1461,6 +1533,17 @@ function createSnowmanHatTop(){
     return snowmanHatTop;
 }
 
+/**
+ * Creates a single piece of coal for use in a snowman face (eyes, mouth, etc.).
+ *
+ * This function constructs a small black sphere mesh using THREE.SphereGeometry
+ * and MeshStandardMaterial. The sphere is sized to resemble a piece of coal,
+ * with a radius of 0.1 units, and is set to both cast and receive shadows
+ * for realistic appearance in the scene. The mesh is suitable for use as
+ * snowman facial features such as eyes or smile components.
+ *
+ * @returns {THREE.Mesh} The mesh representing a single coal piece.
+ */
 function createCoalPiece(){
     const coalGeometry = new THREE.SphereGeometry(0.1, 32, 32);
     const coalMaterial = new THREE.MeshStandardMaterial({
@@ -1473,6 +1556,16 @@ function createCoalPiece(){
     return coalPiece;
 }
 
+/**
+ * Creates the eyes for the snowman using two coal pieces.
+ *
+ * This function generates a THREE.Group containing two small black spheres,
+ * positioned symmetrically to represent the snowman's eyes on its face.
+ * Each eye is created using the createCoalPiece() helper function,
+ * and placed at (0.5, 5.25, 0.8) and (-0.5, 5.25, 0.8) respectively.
+ *
+ * @returns {THREE.Group} A group containing the two eye meshes for the snowman face.
+ */
 function createSnowmanEyes(){
     const eyesGroup = new THREE.Group();
     const snowmanEye1 = createCoalPiece();
@@ -1484,6 +1577,16 @@ function createSnowmanEyes(){
     return eyesGroup;
 }
 
+/**
+ * Creates the carrot nose for the snowman.
+ *
+ * This function constructs a THREE.Mesh shaped like a cone to represent the snowman's nose,
+ * resembling a carrot. The cone has a base radius of 0.15 units, height of 0.5 units, and
+ * uses 32 radial segments for smoothness. It is colored orange (hex 0xffa500), positioned
+ * at (0, 5, 1.25) on the snowman's head, and rotated so it points outward from the face.
+ *
+ * @returns {THREE.Mesh} The mesh representing the snowman's carrot nose.
+ */
 function createSnowmanNose(){
     const noseGeometry = new THREE.ConeGeometry(0.15, 0.5, 32);
     const noseMaterial = new THREE.MeshStandardMaterial({
@@ -1496,6 +1599,22 @@ function createSnowmanNose(){
     return snowmanNose;
 }
 
+/**
+ * Creates the smile for the snowman using coal pieces.
+ *
+ * This function constructs a THREE.Group containing five small black spheres, each created
+ * by the createCoalPiece() helper. The pieces are carefully positioned to form an arc beneath
+ * the eyes and nose, giving the appearance of a classic coal smile common on snowmen.
+ *
+ * The coal pieces are positioned at:
+ *   (0.5, 4.75, 0.8)
+ *   (-0.5, 4.75, 0.8)
+ *   (0, 4.5, 0.85)
+ *   (0.3, 4.57, 0.85)
+ *   (-0.3, 4.57, 0.85)
+ *
+ * @returns {THREE.Group} A group containing the five meshes forming the snowman's smile.
+ */
 function createSnowmanSmile(){
     const smileGroup = new THREE.Group();
     const piece1 = createCoalPiece();
@@ -1518,6 +1637,16 @@ function createSnowmanSmile(){
     return smileGroup;
 }
 
+/**
+ * Creates the face of the snowman as a THREE.Group.
+ *
+ * This function constructs a group containing the snowman's eyes, nose, and smile,
+ * each created by their respective helper functions: createSnowmanEyes(), createSnowmanNose(),
+ * and createSnowmanSmile(). The components are positioned such that, when added to the snowman,
+ * they appear in their standard face locations on the head.
+ *
+ * @returns {THREE.Group} A group containing the snowman's facial features.
+ */
 function createSnowmanFace(){
     const faceGroup = new THREE.Group();
     faceGroup.add(createSnowmanEyes());
@@ -1526,6 +1655,21 @@ function createSnowmanFace(){
     return faceGroup;
 }
 
+/**
+ * Creates the buttons for the snowman as a THREE.Group.
+ *
+ * This function constructs a group containing three coal "button" pieces,
+ * each created by the createCoalPiece() helper. The buttons are scaled up
+ * for visibility and positioned vertically along the snowman's front torso.
+ * Typical use: add the returned group to the snowman mesh.
+ *
+ * Button positions (in world coordinates, relative to the snowman center):
+ *   (0, 3.85, 1.25) - Upper button
+ *   (0, 3, 1.5)     - Middle button
+ *   (0, 1.75, 1.85) - Lower button
+ *
+ * @returns {THREE.Group} A group containing the three snowman button meshes.
+ */
 function createSnowmanButtons(){
     const buttonsGroup = new THREE.Group();
     const button1 = createCoalPiece();
@@ -1543,6 +1687,17 @@ function createSnowmanButtons(){
     return buttonsGroup;
 }
 
+/**
+ * Creates and adds a snowman to the scene at the specified (x, z) coordinates.
+ *
+ * This function constructs a snowman using helper functions for each part: bottom,
+ * middle, top, hat, face, and buttons. The snowman parts are combined into a group,
+ * positioned on the terrain according to the ground height at (x, z), and added to the scene.
+ *
+ * @param {number} x - The X coordinate where the snowman will be placed.
+ * @param {number} z - The Z coordinate where the snowman will be placed.
+ * @returns {THREE.Group} The group representing the created snowman.
+ */
 function createSnowman(x, z) {
     snowmanGroup = new THREE.Group();
     snowmanGroup.add(createSnowmanBottom());
@@ -1553,14 +1708,22 @@ function createSnowman(x, z) {
     snowmanGroup.add(createSnowmanButtons());
     snowmanGroup.position.set(x, getHeightAt(x, z), z);
     scene.add(snowmanGroup);
-    //sceneObjects.push({ x, z });
     return snowmanGroup;
 }
 
+/**
+ * Creates the trunk of a pine tree as a THREE.Mesh.
+ *
+ * This function constructs a brown cylinder to represent the tree trunk,
+ * sets its position so it rises above the ground, and enables shadow
+ * casting and receiving for realistic lighting interaction.
+ *
+ * @returns {THREE.Mesh} The mesh representing the tree trunk.
+ */
 function createTreeTrunk(){
     const trunkGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
     const trunkMaterial = new THREE.MeshStandardMaterial({
-        color: 0x654321, // a deeper brown
+        color: 0x654321,
         side: THREE.DoubleSide
     });
     const trunkMesh = new THREE.Mesh(trunkGeometry, trunkMaterial);
@@ -1570,45 +1733,71 @@ function createTreeTrunk(){
     return trunkMesh;
 }
 
+/**
+ * Creates the bottom section of a pine tree as a THREE.Mesh.
+ *
+ * This function constructs the lowest tier of the tree foliage using a cylinder geometry,
+ * colored dark green, and sets its position to sit above the trunk. Shadow properties are enabled
+ * to allow the bottom tree part to cast and receive shadows, contributing to realistic lighting.
+ *
+ * @returns {THREE.Mesh} The mesh representing the bottom foliage section of the pine tree.
+ */
 function createTreeBottom(){
     const bottomGeom = new THREE.CylinderGeometry(1.5, 3, 2.25, 32);
-    const bottomMaterial = new THREE.MeshStandardMaterial({
-        color: 0x023020, // dark green
-        side: THREE.DoubleSide
-    });
-    const bottomMesh = new THREE.Mesh(bottomGeom, bottomMaterial);
+    const bottomMesh = new THREE.Mesh(bottomGeom, treeMaterial);
     bottomMesh.position.set(0, 2, 0);
     bottomMesh.castShadow = true;
     bottomMesh.receiveShadow = true;
     return bottomMesh;
 }
 
+/**
+ * Creates the middle section of a pine tree as a THREE.Mesh.
+ *
+ * This function constructs the middle tier of the tree foliage using a cylinder geometry,
+ * colored according to treeMaterial, and sets its position to sit above the bottom tier.
+ * Shadow casting and receiving are enabled for realistic lighting.
+ *
+ * @returns {THREE.Mesh} The mesh representing the middle foliage section of the pine tree.
+ */
 function createTreeMiddle(){
     const middleGeom = new THREE.CylinderGeometry(1, 2.25, 2.25, 32);
-    const middleMaterial = new THREE.MeshStandardMaterial({
-        color: 0x023020, // dark green
-        side: THREE.DoubleSide
-    });
-    const middleMesh = new THREE.Mesh(middleGeom, middleMaterial);
+    const middleMesh = new THREE.Mesh(middleGeom, treeMaterial);
     middleMesh.position.set(0, 4.25, 0);
     middleMesh.castShadow = true;
     middleMesh.receiveShadow = true;
     return middleMesh;
 }
 
+/**
+ * Creates the top section of a pine tree as a THREE.Mesh.
+ *
+ * This function constructs the uppermost tier of the tree foliage using a cone geometry,
+ * colored according to the shared treeMaterial, and positions it above the middle tier.
+ * Shadow casting and receiving are enabled to enhance visual realism with lighting.
+ *
+ * @returns {THREE.Mesh} The mesh representing the top foliage section of the pine tree.
+ */
 function createTreeTop(){
     const topGeom = new THREE.ConeGeometry(1.5, 2.25, 32);
-    const topMaterial = new THREE.MeshStandardMaterial({
-        color: 0x023020, // dark green
-        side: THREE.DoubleSide
-    });
-    const topMesh = new THREE.Mesh(topGeom, topMaterial);
+    const topMesh = new THREE.Mesh(topGeom, treeMaterial);
     topMesh.position.set(0, 6.5, 0);
     topMesh.castShadow = true;
     topMesh.receiveShadow = true;
     return topMesh;
 }
 
+/**
+ * Creates the bottom layer of snow for a pine tree as a THREE.Mesh.
+ *
+ * This function constructs a short, wide cylinder representing accumulated snow
+ * resting on the lowest foliage tier of the tree. The geometry's radii are slightly
+ * larger than the foliage to visually overhang the leaves. The mesh uses the
+ * shared snowMaterial for a snowy appearance, is positioned just above the trunk,
+ * and can cast and receive shadows for realistic lighting effects.
+ *
+ * @returns {THREE.Mesh} The mesh representing the bottom snow layer of the tree.
+ */
 function createBottomTreeSnow(){
     const bottomSnowGeom = new THREE.CylinderGeometry(2.8, 3.1, 0.5, 32);
     const bottomSnowMesh = new THREE.Mesh(bottomSnowGeom, snowMaterial);
@@ -1618,6 +1807,17 @@ function createBottomTreeSnow(){
     return bottomSnowMesh;
 }
 
+/**
+ * Creates the middle layer of snow for a pine tree as a THREE.Mesh.
+ *
+ * This function constructs a short, medium-width cylinder representing
+ * accumulated snow resting on the middle foliage tier of the pine tree.
+ * The mesh uses the shared snowMaterial to give a snowy appearance, is
+ * positioned above the bottom snow layer, and is set to both cast and
+ * receive shadows for realistic lighting effects.
+ *
+ * @returns {THREE.Mesh} The mesh representing the middle snow layer of the tree.
+ */
 function createMiddleTreeSnow(){
     const middleSnowGeom = new THREE.CylinderGeometry(2.1, 2.35, 0.5, 32);
     const middleSnowMesh = new THREE.Mesh(middleSnowGeom, snowMaterial);
@@ -1627,6 +1827,17 @@ function createMiddleTreeSnow(){
     return middleSnowMesh;
 }
 
+/**
+ * Creates the top layer of snow for a pine tree as a THREE.Mesh.
+ *
+ * This function constructs a short, narrow cylinder representing
+ * accumulated snow resting on the top foliage tier of the pine tree.
+ * The mesh uses the shared snowMaterial to simulate a snowy appearance,
+ * is positioned above the middle snow layer, and is set to both cast and
+ * receive shadows for realistic lighting effects.
+ *
+ * @returns {THREE.Mesh} The mesh representing the top snow layer of the tree.
+ */
 function createTopTreeSnow(){
     const topSnowGeom = new THREE.CylinderGeometry(1.45, 1.75, 0.5, 32);
     const topSnowMesh = new THREE.Mesh(topSnowGeom, snowMaterial);
@@ -1636,6 +1847,18 @@ function createTopTreeSnow(){
     return topSnowMesh;
 }
 
+/**
+ * Creates a group containing the three snow layers for a pine tree.
+ *
+ * This function assembles the bottom, middle, and top snow layers—
+ * each represented as a THREE.Mesh—into a single THREE.Group. The
+ * resulting group accurately positions each snow layer to rest on
+ * the corresponding parts of the tree and maintains shadow properties
+ * for realistic lighting. Useful for constructing a complete snowy
+ * effect on a pine tree model.
+ *
+ * @returns {THREE.Group} A THREE.Group containing all the snow layers for the tree.
+ */
 function createTreeSnow(){
     const snowGroup = new THREE.Group();
     snowGroup.add(createBottomTreeSnow());
@@ -1644,6 +1867,20 @@ function createTreeSnow(){
     return snowGroup;
 }
 
+/**
+ * Asynchronously loads and prepares a star model for the top of a pine tree.
+ *
+ * This function utilizes GLTFLoader to load a 3D GLTF model of a Christmas star from the specified path.
+ * After loading, it clones the scene and sets its position on top of the tree.
+ * The function sets both castShadow and receiveShadow for the star and its mesh children to ensure
+ * proper lighting integration into the scene. Additionally, it enhances all mesh materials by cloning them
+ * and applying an emissive yellow glow for visual effect.
+ *
+ * @async
+ * @function
+ * @returns {Promise<THREE.Object3D | undefined>} A promise that resolves to the cloned and prepared star
+ *   Object3D, or undefined if loading fails.
+ */
 async function loadTreeStar(){
     const loader = new GLTFLoader();
     try {
@@ -1658,19 +1895,16 @@ async function loadTreeStar(){
                 child.castShadow = true;
                 child.receiveShadow = true;
                 
-                // Make the star glow by adding emissive properties
                 if (child.material) {
-                    // Helper function to add emissive glow to a material
                     const addEmissiveGlow = (material) => {
                         if (!material) return material;
                         const newMaterial = material.clone();
-                        newMaterial.emissive = new THREE.Color(0xffffaa); // Warm yellow-gold
-                        newMaterial.emissiveIntensity = 0.5; // How bright it glows
+                        newMaterial.emissive = new THREE.Color(0xffffaa);
+                        newMaterial.emissiveIntensity = 0.5;
                         newMaterial.needsUpdate = true;
                         return newMaterial;
                     };
                     
-                    // Handle both single materials and arrays
                     child.material = Array.isArray(child.material)
                         ? child.material.map(addEmissiveGlow)
                         : addEmissiveGlow(child.material);
@@ -1684,17 +1918,36 @@ async function loadTreeStar(){
     }
 }
 
+/**
+ * Creates and arranges decorative sprite-based lights for a Christmas tree.
+ *
+ * This function generates groups of colored lights, forming concentric rings around 
+ * different heights of the pine tree. Each ring's lights are evenly distributed in angle,
+ * with their positions staggered on alternating rings for a natural, wrapped look.
+ * Colors are randomly chosen from the global `lightColors` array. Lights are implemented 
+ * as THREE.Sprite objects using an additive blending material, giving a glowing effect.
+ *
+ * @function
+ * @returns {THREE.Group} A THREE.Group containing sprites representing the tree's lights,
+ *   ready to be added to a tree object.
+ */
 function createTreeLights(){
     const lightsGroup = new THREE.Group();
 
-    // Parameters for the tree segment locations in Y, approximate radii, and lights per ring
     const segments = [
-        { y: 2, r: 3.25, lightsPerRing: 12 },      // bottom third (just above trunk) - most lights
-        { y: 4.25, r: 2.35, lightsPerRing: 8 },     // middle triangle - fewer lights
-        { y: 6.5, r: 1.25, lightsPerRing: 4 }   // top triangle just under star - even fewer lights
+        { y: 2, r: 3.25, lightsPerRing: 12 },
+        { y: 4.25, r: 2.35, lightsPerRing: 8 },
+        { y: 6.5, r: 1.25, lightsPerRing: 4 }
     ];
 
-    // Helper function to create a ring of lights
+    /**
+     * Creates a single ring of lights as sprites.
+     * @param {number} centerY - The Y position for the ring.
+     * @param {number} radius - The radius of the ring.
+     * @param {number} angleOffset - The starting angle offset (in radians) for staggering lights.
+     * @param {number} lightsPerRing - Number of lights to distribute in this ring.
+     * @returns {THREE.Sprite[]} Array of THREE.Sprite objects positioned on the ring.
+     */
     function createRing(centerY, radius, angleOffset, lightsPerRing) {
         const ringLights = [];
         const angleStep = (2 * Math.PI) / lightsPerRing;
@@ -1704,7 +1957,6 @@ function createTreeLights(){
             const x = radius * Math.cos(angle);
             const z = radius * Math.sin(angle);
             
-            // Choose random color for each light
             const color = lightColors[Math.floor(Math.random() * lightColors.length)];
             
             const spriteMaterial = new THREE.SpriteMaterial({
@@ -1723,19 +1975,15 @@ function createTreeLights(){
         return ringLights;
     }
 
-    // Create two rings for each segment (staggered for zigzag pattern)
     for (let s = 0; s < segments.length; s++) {
         const seg = segments[s];
-        // Stagger offset for zigzag pattern (half the angle between lights)
         const staggerOffset = Math.PI / seg.lightsPerRing;
         
-        // Bottom ring: larger radius, positioned lower
         const bottomRingRadius = seg.r * 0.85;
         const bottomRingY = seg.y - 0.3;
         const bottomRingLights = createRing(bottomRingY, bottomRingRadius, 0, seg.lightsPerRing);
         bottomRingLights.forEach(light => lightsGroup.add(light));
         
-        // Top ring: smaller radius, positioned higher, staggered for zigzag
         const topRingRadius = seg.r * 0.65;
         const topRingY = seg.y + 0.3;
         const topRingLights = createRing(topRingY, topRingRadius, staggerOffset, seg.lightsPerRing);
@@ -1745,6 +1993,20 @@ function createTreeLights(){
     return lightsGroup;
 }
 
+/**
+ * Assembles and places a decorated Christmas tree at the specified world coordinates.
+ *
+ * This function constructs a tree by creating and grouping together its basic parts:
+ * trunk, layered foliage (bottom, middle, top), a layer of snow, and lights.
+ * It asynchronously loads a star asset and adds it to the top, if available.
+ * The tree is positioned based on the given (x, z) on the ground height at that point,
+ * and the whole tree is added to the global scene.
+ *
+ * @async
+ * @param {number} x - The X coordinate for the tree location.
+ * @param {number} z - The Z coordinate for the tree location.
+ * @returns {Promise<THREE.Group>} The assembled THREE.Group representing the complete tree.
+ */
 async function createTree(x, z){
     const treeGroup = new THREE.Group();
     treeGroup.add(createTreeTrunk());
@@ -1765,7 +2027,14 @@ async function createTree(x, z){
 }
 
 /**
- * Checks if a position is valid for placing objects (snowmen, trees, etc.)
+ * Determines whether a given (x, z) position in the scene is suitable for placing a new object—such as a snowman or tree—by enforcing spatial constraints.
+ *
+ * The function checks that the proposed position:
+ *   1. Is sufficiently far from major scene features such as the cottage and pond, respecting their radii plus an extra buffer.
+ *   2. Does not violate minimum spacing requirements from any manually excluded locations, comparing both the new object's required spacing and the exclusion's own spacing.
+ *   3. Maintains enough distance from all previously placed objects of the same type (provided in `existingObjects`), by using the greater of the new and existing object's minimum spacing values.
+ *
+ * The position is only considered valid if all distance checks pass.
  * @param {number} x - X coordinate to check
  * @param {number} z - Z coordinate to check
  * @param {Array<{x: number, z: number, minSpacing: number}>} existingObjects - Array of existing objects with their positions and minimum spacing requirements
@@ -1775,36 +2044,29 @@ async function createTree(x, z){
  * @returns {boolean} True if the position is valid, false otherwise
  */
 function isValidPosition(x, z, existingObjects = [], minDistanceFromStructures = 6, newObjectSpacing = 0, excludePositions = []) {
-    // Constants for structure positions
     const COTTAGE_CENTER = { x: 25, z: 10 };
-    const COTTAGE_EXCLUSION_RADIUS = 12; // About the size of the cottage group
-    const POND_CENTER = { x: -30, z: 0 }; // Match actual pond position from createIcyPond()
+    const COTTAGE_EXCLUSION_RADIUS = 12;
+    const POND_CENTER = { x: -30, z: 0 };
     const POND_RADIUS = 25;
     
-    // Check distance from pond
     const pondDist = Math.sqrt(Math.pow(x - POND_CENTER.x, 2) + Math.pow(z - POND_CENTER.z, 2));
     if (pondDist < POND_RADIUS + minDistanceFromStructures) {
         return false;
     }
     
-    // Check distance from cottage
     const cottageDist = Math.sqrt(Math.pow(x - COTTAGE_CENTER.x, 2) + Math.pow(z - COTTAGE_CENTER.z, 2));
     if (cottageDist < COTTAGE_EXCLUSION_RADIUS + minDistanceFromStructures) {
         return false;
     }
     
-    // Check distance from exclude positions (e.g., manually placed objects)
     for (const excludePos of excludePositions) {
         const dist = Math.sqrt(Math.pow(x - excludePos.x, 2) + Math.pow(z - excludePos.z, 2));
-        // Use maximum of new object spacing and exclude position spacing
         const requiredSpacing = Math.max(newObjectSpacing, excludePos.minSpacing);
         if (dist < requiredSpacing) {
             return false;
         }
     }
     
-    // Check distance from all existing objects
-    // Use the maximum of the new object's spacing and each existing object's spacing
     for (const existingObj of existingObjects) {
         const dist = Math.sqrt(Math.pow(x - existingObj.x, 2) + Math.pow(z - existingObj.z, 2));
         const requiredSpacing = Math.max(newObjectSpacing, existingObj.minSpacing);
@@ -1818,6 +2080,13 @@ function isValidPosition(x, z, existingObjects = [], minDistanceFromStructures =
 
 /**
  * Generates items evenly distributed across the scene using a grid-based approach
+ *
+ * This function distributes items (e.g., snowmen, trees) across the scene in a roughly square grid pattern,
+ * ensuring even spacing between each item while respecting minimum distance constraints from major scene features
+ * (cottage, pond) and previously placed objects of the same type.
+ *
+ * The grid is calculated based on the available width and depth of the scene, excluding a specified edge clearance.
+ * Items are placed in random positions within each grid cell, with some jitter to avoid exact centering.
  * @param {number} count - Number of items to generate
  * @param {number} spacing - Minimum distance between items of this type
  * @param {number} minDistanceFromStructures - Minimum distance from pond/cottage
@@ -1825,59 +2094,47 @@ function isValidPosition(x, z, existingObjects = [], minDistanceFromStructures =
  * @param {Array<{x: number, z: number, minSpacing: number}>} existingObjects - Optional array of existing objects to avoid (e.g., other item types)
  * @param {number} edgeClearance - Clearance from ground edges (default: 5)
  * @param {number} maxTriesPerCell - Maximum attempts to place an item in each cell (default: 20)
- * @returns {Promise<Array<{x: number, z: number}>>} Promise that resolves to array of placed item positions
+ * @returns {Promise<Array<{x: number, z: number}>>} Promise that resolves to array of placed item positions (x, z) coordinates
  */
 async function generateItem(count, spacing, minDistanceFromStructures, createFunction, existingObjects = [], edgeClearance = 5, maxTriesPerCell = 20) {
-    // Calculate available area (excluding edge clearance)
     const availableWidth = (groundBounds.xMax - groundBounds.xMin) - (edgeClearance * 2);
     const availableDepth = (groundBounds.zMax - groundBounds.zMin) - (edgeClearance * 2);
     
-    // Calculate grid dimensions for even distribution
-    // Try to create a roughly square grid
     const gridCols = Math.ceil(Math.sqrt(count * (availableWidth / availableDepth)));
     const gridRows = Math.ceil(count / gridCols);
     
     const cellWidth = availableWidth / gridCols;
     const cellDepth = availableDepth / gridRows;
     
-    // Track positions of placed items
     const placedItems = [];
     let itemIndex = 0;
 
-    // Iterate through grid cells and place items
     for (let row = 0; row < gridRows && itemIndex < count; row++) {
         for (let col = 0; col < gridCols && itemIndex < count; col++) {
-            // Calculate the center of this grid cell
             const cellCenterX = groundBounds.xMin + edgeClearance + (col + 0.5) * cellWidth;
             const cellCenterZ = groundBounds.zMin + edgeClearance + (row + 0.5) * cellDepth;
             
-            // Try to place an item in this cell with some jitter
-            const maxJitter = Math.min(cellWidth, cellDepth) * 0.3; // 30% of cell size
+            const maxJitter = Math.min(cellWidth, cellDepth) * 0.3;
             let tries = 0;
             let placed = false;
             
             while (tries < maxTriesPerCell && !placed) {
-                // Add random jitter within the cell
                 const jitterX = (Math.random() - 0.5) * maxJitter;
                 const jitterZ = (Math.random() - 0.5) * maxJitter;
                 const x = cellCenterX + jitterX;
                 const z = cellCenterZ + jitterZ;
                 
-                // Make sure we're still within bounds
                 if (x < groundBounds.xMin + edgeClearance || x > groundBounds.xMax - edgeClearance ||
                     z < groundBounds.zMin + edgeClearance || z > groundBounds.zMax - edgeClearance) {
                     tries++;
                     continue;
                 }
                 
-                // Combine existing objects with already placed items of this type
                 const allExistingObjects = [
                     ...existingObjects,
                     ...placedItems.map(pos => ({ x: pos.x, z: pos.z, minSpacing: spacing }))
                 ];
                 
-                // Check if position is valid
-                // Pass spacing as newObjectSpacing to ensure proper spacing between different object types
                 if (isValidPosition(x, z, allExistingObjects, minDistanceFromStructures, spacing)) {
                     await createFunction(x, z);
                     placedItems.push({ x, z });
@@ -1893,26 +2150,49 @@ async function generateItem(count, spacing, minDistanceFromStructures, createFun
     return placedItems;
 }
 
+/**
+ * Asynchronously generates and places snowmen within the scene.
+ *
+ * This function determines positions for a fixed number of snowmen
+ * such that each snowman is spaced a minimum distance apart from others
+ * and does not overlap existing scene objects. It uses generateItem for
+ * placement logic and then updates the global `sceneObjects` array so
+ * other elements can avoid colliding with snowmen.
+ *
+ * @async
+ * @returns {Promise<void>} Resolves when all snowmen have been placed and the sceneObjects array is updated.
+ */
 async function generateSnowmen(){
     const SNOWMAN_COUNT = 7;
-    const SNOWMAN_MIN_DIST = 6; // Minimum distance from cottage center and pond/cottage edge
-    const SNOWMAN_SPACING = 8; // Minimum distance between snowmen
+    const SNOWMAN_MIN_DIST = 6;
+    const SNOWMAN_SPACING = 8;
     
-    // Generate snowmen using the general function
     const placedSnowmen = await generateItem(
         SNOWMAN_COUNT,
         SNOWMAN_SPACING,
         SNOWMAN_MIN_DIST,
         createSnowman,
-        sceneObjects // Pass existing scene objects to avoid
+        sceneObjects
     );
     
-    // Add snowmen positions to sceneObjects so other items can avoid them
     for (const pos of placedSnowmen) {
         sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: SNOWMAN_SPACING });
     }
 }
 
+/**
+ * Asynchronously generates and places trees within the scene.
+ *
+ * This function determines positions for a fixed number of trees
+ * such that each tree is spaced at least a minimum distance apart
+ * from others and does not overlap existing scene objects.
+ * It utilizes the generateItem function for placement logic and
+ * then updates the global `sceneObjects` array so that future
+ * placed elements can avoid colliding with trees.
+ *
+ * @async
+ * @returns {Promise<void>} Resolves when all trees have been placed and the sceneObjects array is updated.
+ */
 async function generateTrees(){
     const TREE_COUNT = 10;
     const TREE_SPACING = 10;
@@ -1922,15 +2202,27 @@ async function generateTrees(){
         TREE_SPACING,
         TREE_MIN_DIST,
         createTree,
-        sceneObjects // Pass existing scene objects to avoid
+        sceneObjects
     );
     
-    // Add trees positions to sceneObjects so other items can avoid them
     for (const pos of placedTrees) {
         sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: TREE_SPACING });
     }
 }
 
+/**
+ * Asynchronously loads the campfire 3D model and prepares it for use in the scene.
+ *
+ * This function uses the GLTFLoader to load the campfire model from the specified path.
+ * It clones the loaded model, assigns it the name 'campfire', and enables both casting
+ * and receiving of shadows on the model and all its mesh children for proper lighting.
+ * If the model loads successfully, the prepared campfire Object3D is returned.
+ * In case of an error during loading, the error is logged to the console and the function returns null.
+ *
+ * @async
+ * @function
+ * @returns {Promise<THREE.Object3D|null>} A promise that resolves to the campfire Object3D if loaded successfully, otherwise null.
+ */
 async function loadCampfire(){
     const loader = new GLTFLoader();
     try {
@@ -1938,7 +2230,6 @@ async function loadCampfire(){
         const campfire = gltf.scene.clone();
         campfire.name = 'campfire';
         
-        // Enable shadows on the group and all its children
         campfire.castShadow = true;
         campfire.receiveShadow = true;
         campfire.traverse((child) => {
@@ -1955,29 +2246,36 @@ async function loadCampfire(){
     return null;
 }
 
-async function createCampfire(){
+/**
+ * Asynchronously creates and places a campfire in the scene.
+ *
+ * This function creates a THREE.Group to hold the campfire model, loads and clones the campfire 3D model,
+ * scales it to a desired height, centers it, and positions the group at a specific world coordinate.
+ * The resulting group is added to both the `sceneObjects` array and the Three.js scene for rendering.
+ * If the campfire model fails to load, a warning is logged and an empty group is still created and returned.
+ *
+ * @async
+ * @function
+ * @returns {Promise<THREE.Group>} A promise that resolves to the THREE.Group containing the campfire model.
+ */
+async function createCampfire() {
     const campfireGroup = new THREE.Group();
     campfireGroup.name = 'campfireGroup';
     
     const campfireModel = await loadCampfire();
     if (campfireModel) {
-        // Calculate bounding box to understand model size
         const box = new THREE.Box3().setFromObject(campfireModel);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
         
-        // Scale the model UP since it's very small (0.036 units)
-        // Scale to make it about 1-2 units tall for visibility
-        const targetHeight = 3; // Desired height in world units
+        const targetHeight = 3;
         const scaleFactor = targetHeight / size.y;
         campfireModel.scale.setScalar(scaleFactor);
         
-        // Center the model at origin (in case it's offset)
         campfireModel.position.sub(center);
         
         campfireGroup.add(campfireModel);
         
-        // Position the campfire at ground height
         const groundHeight = getHeightAt(-75, -3);
         campfireGroup.position.set(-75, groundHeight, -3);
         
@@ -1990,6 +2288,19 @@ async function createCampfire(){
     return campfireGroup;
 }
 
+/**
+ * Asynchronously loads and returns a log 3D model.
+ *
+ * This function uses GLTFLoader to load a log model from the specified path.
+ * The loaded model is cloned, named, and prepared for the scene: it is scaled and
+ * configured to both cast and receive shadows. If the model is successfully loaded,
+ * it is returned as a THREE.Object3D instance. If loading fails, the error is logged
+ * and null is returned.
+ *
+ * @async
+ * @function
+ * @returns {Promise<THREE.Object3D|null>} The loaded log object, or null if loading fails.
+ */
 async function loadLog(){
     const loader = new GLTFLoader();
     try {
@@ -1997,7 +2308,6 @@ async function loadLog(){
         const log = gltf.scene.clone();
         log.name = 'log';
         
-        // Enable shadows on the group and all its children
         log.castShadow = true;
         log.receiveShadow = true;
         log.traverse((child) => {
@@ -2016,10 +2326,21 @@ async function loadLog(){
     return null;
 }
 
+/**
+ * Asynchronously adds logs around the campfire in the scene.
+ *
+ * This function loads four individual log 3D models, positions them in a circle
+ * around the campfire, and rotates two of them to simulate seating logs.
+ * The logs are grouped together in a THREE.Group object, which is added to the scene
+ * and sceneObjects array for proper rendering and management.
+ *
+ * @async
+ * @function
+ * @returns {Promise<THREE.Group>} The group containing all the log objects placed around the campfire.
+ */
 async function addLogsAroundCampfire(){
     const logGroup = new THREE.Group();
     
-    // Load all logs
     const log1 = await loadLog();
     const log2 = await loadLog();
     const log3 = await loadLog();
@@ -2043,7 +2364,18 @@ async function addLogsAroundCampfire(){
     return logGroup;
 }
 
-// Function to resume audio context (required by browsers after user interaction)
+/**
+ * Attempts to resume the audio context if it is suspended.
+ *
+ * This function checks if the global audioListener and its context exist; 
+ * if the audio context's state is 'suspended', it calls the resume() method.
+ * This is necessary on some browsers, such as Chrome, where audio playback may 
+ * be suspended until user interaction occurs. The function logs success or 
+ * error messages accordingly.
+ *
+ * @function
+ * @returns {void}
+ */
 export function resumeAudioContext() {
     if (audioListener && audioListener.context) {
         if (audioListener.context.state === 'suspended') {
@@ -2056,13 +2388,22 @@ export function resumeAudioContext() {
     }
 }
 
-// Check if elf is near campfire and control audio playback
+/**
+ * Checks the distance between the elf and the campfire and controls the fire crackle sound.
+ *
+ * This function determines whether the elf is within a certain proximity to the campfire group.
+ * If the elf is close enough (within `proximityRadius` units), it ensures the fire crackle
+ * sound plays (resuming the audio context if necessary). Otherwise, it pauses the crackle sound.
+ * The function performs necessary null checks to ensure all relevant objects are loaded.
+ *
+ * @function
+ * @returns {void}
+ */
 export function checkCampfireProximity() {
     if (!elf || !audioListener || !fireCrackleSound) {
         return;
     }
     
-    // Find campfire if not stored
     if (!campfireGroup) {
         campfireGroup = scene.children.find(child => child.name === 'campfireGroup');
     }
@@ -2071,28 +2412,34 @@ export function checkCampfireProximity() {
         return;
     }
     
-    // Calculate distance between elf and campfire
     const distance = elf.position.distanceTo(campfireGroup.position);
-    const proximityRadius = 20;
+    const proximityRadius = 30;
     
-    // Control audio based on proximity
     if (distance <= proximityRadius) {
-        // Within radius: resume audio context and play sound
         resumeAudioContext();
         if (!fireCrackleSound.isPlaying) {
             fireCrackleSound.play();
         }
     } else {
-        // Outside radius: pause/stop the sound
         if (fireCrackleSound.isPlaying) {
             fireCrackleSound.pause();
         }
     }
 }
 
+/**
+ * Creates and attaches a looping positional fire crackle sound to the provided fire group.
+ *
+ * Initializes an audio listener (adding it to the camera if necessary), then creates a new
+ * THREE.PositionalAudio object using the listener. Loads the fire crackle sound file asynchronously,
+ * configures audio properties such as reference distance, max distance, rolloff factor, looping,
+ * and volume, and attaches the positional sound to the given fire group object.
+ * Also assigns the positional audio to the global fireCrackleSound variable for later access.
+ *
+ * @param {THREE.Group} fire - The campfire group to which the crackle sound should be attached.
+ * @returns {void}
+ */
 function makeFireCrackle(fire){
-    // Use spatial sound to make fire crackle as you get closer to the campfire
-    // Create audio listener once and add to camera
     if (!audioListener) {
         audioListener = new THREE.AudioListener();
         camera.add(audioListener);
@@ -2102,32 +2449,21 @@ function makeFireCrackle(fire){
     const posSound1 = new THREE.PositionalAudio(audioListener);
     const audioLoader = new THREE.AudioLoader();
     
-    // Store global reference to the sound
     fireCrackleSound = posSound1;
     
-    // Position the sound at the campfire location (relative to the fire group)
-    posSound1.position.set(0, 0, 0); // At the center of the fire group
+    posSound1.position.set(0, 0, 0);
     
     audioLoader.load(
         '/sounds/fire-crackle.mp3',
         function(buffer) {
             posSound1.setBuffer(buffer);
-            posSound1.setRefDistance(5); // Distance at which volume is 100%
-            posSound1.setMaxDistance(50); // Maximum distance at which sound can be heard
-            posSound1.setRolloffFactor(1); // How quickly sound fades (lower = slower fade)
+            posSound1.setRefDistance(5);
+            posSound1.setMaxDistance(50);
+            posSound1.setRolloffFactor(8);
             posSound1.setLoop(true);
-            posSound1.setVolume(0.5); // Set volume (0 to 1)
+            posSound1.setVolume(0.5);
             
-            // Add sound to the fire object
             fire.add(posSound1);
-            
-            // Don't play immediately - wait for proximity check
-            // posSound1.play() will be called in checkCampfireProximity()
-            
-            console.log('Fire crackle sound loaded at position:', fire.position);
-        },
-        function(progress) {
-            // Progress callback (optional)
         },
         function(error) {
             console.error('Error loading fire crackle sound:', error);
