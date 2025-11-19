@@ -15,12 +15,15 @@ let pond = null;
 let elf = null;
 export let northernLights = null;
 let snowmanGroup = null;
+let campfireGroup = null;
 const snowMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     side: THREE.DoubleSide,
     map: loadSnowTexture()
 });
 let sceneObjects = [];
+let audioListener = null;
+let fireCrackleSound = null;
 
 //global ground bounds
 const groundBounds = {
@@ -1761,8 +1764,96 @@ async function addLogsAroundCampfire(){
     return logGroup;
 }
 
-function makeFireCrackle(){
-    //use spacial sound to make fire crackle as you get closer to the campfire
+// Function to resume audio context (required by browsers after user interaction)
+export function resumeAudioContext() {
+    if (audioListener && audioListener.context) {
+        if (audioListener.context.state === 'suspended') {
+            audioListener.context.resume().then(() => {
+                console.log('Audio context resumed');
+            }).catch((err) => {
+                console.error('Error resuming audio context:', err);
+            });
+        }
+    }
+}
+
+// Check if elf is near campfire and control audio playback
+export function checkCampfireProximity() {
+    if (!elf || !audioListener || !fireCrackleSound) {
+        return;
+    }
+    
+    // Find campfire if not stored
+    if (!campfireGroup) {
+        campfireGroup = scene.children.find(child => child.name === 'campfireGroup');
+    }
+    
+    if (!campfireGroup) {
+        return;
+    }
+    
+    // Calculate distance between elf and campfire
+    const distance = elf.position.distanceTo(campfireGroup.position);
+    const proximityRadius = 20;
+    
+    // Control audio based on proximity
+    if (distance <= proximityRadius) {
+        // Within radius: resume audio context and play sound
+        resumeAudioContext();
+        if (!fireCrackleSound.isPlaying) {
+            fireCrackleSound.play();
+        }
+    } else {
+        // Outside radius: pause/stop the sound
+        if (fireCrackleSound.isPlaying) {
+            fireCrackleSound.pause();
+        }
+    }
+}
+
+function makeFireCrackle(fire){
+    // Use spatial sound to make fire crackle as you get closer to the campfire
+    // Create audio listener once and add to camera
+    if (!audioListener) {
+        audioListener = new THREE.AudioListener();
+        camera.add(audioListener);
+        console.log('Audio listener created and added to camera');
+    }
+    
+    const posSound1 = new THREE.PositionalAudio(audioListener);
+    const audioLoader = new THREE.AudioLoader();
+    
+    // Store global reference to the sound
+    fireCrackleSound = posSound1;
+    
+    // Position the sound at the campfire location (relative to the fire group)
+    posSound1.position.set(0, 0, 0); // At the center of the fire group
+    
+    audioLoader.load(
+        '/sounds/fire-crackle.mp3',
+        function(buffer) {
+            posSound1.setBuffer(buffer);
+            posSound1.setRefDistance(5); // Distance at which volume is 100%
+            posSound1.setMaxDistance(50); // Maximum distance at which sound can be heard
+            posSound1.setRolloffFactor(1); // How quickly sound fades (lower = slower fade)
+            posSound1.setLoop(true);
+            posSound1.setVolume(0.5); // Set volume (0 to 1)
+            
+            // Add sound to the fire object
+            fire.add(posSound1);
+            
+            // Don't play immediately - wait for proximity check
+            // posSound1.play() will be called in checkCampfireProximity()
+            
+            console.log('Fire crackle sound loaded at position:', fire.position);
+        },
+        function(progress) {
+            // Progress callback (optional)
+        },
+        function(error) {
+            console.error('Error loading fire crackle sound:', error);
+        }
+    );
 }
 
 function createPath(){
@@ -1789,7 +1880,8 @@ export async function setupOutdoorScene(){
     addChristmasLightsToCottage();
     generateSnow();
     createIcyPond();
-    await createCampfire();
+    campfireGroup = await createCampfire();
+    makeFireCrackle(campfireGroup);
     await addLogsAroundCampfire();
     await generateSnowmen();
     //generateTestBoxes();

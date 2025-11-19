@@ -27,6 +27,11 @@ module.exports = {
                 test: /\.(stl|obj|mtl|gltf|glb)$/i,
                 type: 'asset/resource',
                 generator: { filename: 'models/[name][ext]', },
+            },
+            {
+                test: /\.(mp3|wav|ogg)$/i,
+                type: 'asset/resource',
+                generator: { filename: 'sounds/[name][ext]', },
             }
         ],
     },
@@ -49,6 +54,10 @@ module.exports = {
                     from: path.resolve(__dirname, 'src', 'textures'),
                     to: path.resolve(__dirname, 'dist', 'textures'),
                 },
+                {
+                    from: path.resolve(__dirname, 'src', 'sounds'),
+                    to: path.resolve(__dirname, 'dist', 'sounds'),
+                },
             ],
         }),
     ],
@@ -64,6 +73,10 @@ module.exports = {
             {
                 directory: path.join(__dirname, 'src', 'textures'),
                 publicPath: '/textures',
+            },
+            {
+                directory: path.join(__dirname, 'src', 'sounds'),
+                publicPath: '/sounds',
             },
         ],
     },

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { setupOutdoorScene } from './outdoor-scene.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-import { moveElf, updateSnow, northernLights, followElf, lookAround } from './outdoor-scene.js';
+import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity } from './outdoor-scene.js';
 
 // Initialize the scene asynchronously
 async function init() {
@@ -54,7 +54,7 @@ async function init() {
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
-
+    
     // Animation loop
     function animate() {
         requestAnimationFrame(animate);
@@ -62,6 +62,7 @@ async function init() {
         lookAround(); // Handle A/D turning and W/S looking up/down
         moveElf(); // Handle arrow key movement
         followElf(); // Update camera to follow elf
+        checkCampfireProximity(); // Check if elf is near campfire and resume audio
         updateSnow(); // Update snow particles
         if (northernLights) {
             northernLights.material.uniforms.time.value += 0.01;
