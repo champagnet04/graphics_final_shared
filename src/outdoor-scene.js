@@ -8,24 +8,24 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 const scene = createScene();
 const camera = setupCamera();
 let cameraPitch = 0;
-
-// Store references to ground, pond, and elf for later use
 let ground = null;
 let pond = null;
 let elf = null;
 export let northernLights = null;
 let snowmanGroup = null;
 let campfireGroup = null;
+
 const snowMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     side: THREE.DoubleSide,
     map: loadSnowTexture()
 });
+
 let sceneObjects = [];
 let audioListener = null;
 let fireCrackleSound = null;
+const keysPressed = {};
 
-//global ground bounds
 const groundBounds = {
     xMin: -100,
     xMax: 100,
@@ -46,15 +46,37 @@ const lightColors = [
     0xffa500  // Orange/gold (for warmth)
 ];
 
-// Track keyboard state
-const keysPressed = {};
 
+
+/**
+ * Creates and initializes the main THREE.js scene.
+ * 
+ * Sets the scene background to a deep night-sky blue/purple color (hex: 0x181848).
+ * This function does not add any objects to the scene.
+ *
+ * @returns {THREE.Scene} The newly created scene instance.
+ */
 function createScene(){
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x181848); // Deep purple-blue night sky
+    scene.background = new THREE.Color(0x181848);
     return scene;
 }
 
+/**
+ * Creates and configures a PerspectiveCamera for the outdoor scene.
+ * 
+ * The camera is set up for a third-person view, positioned initially behind and above
+ * the expected location of the player character (the elf), looking slightly ahead.
+ * 
+ * - Field of view: 70 degrees
+ * - Aspect ratio: 1 (should be updated to match renderer later)
+ * - Near plane: 0.1
+ * - Far plane: 2000
+ * - Initial position: (0, 5, -8) -- behind and above the elf at (0, 0, 0)
+ * - Looks towards: (0, 1, 3) -- slightly ahead of the elf
+ * 
+ * @returns {THREE.PerspectiveCamera} Configured perspective camera
+ */
 function setupCamera(){
     const camera = new THREE.PerspectiveCamera(
         70,
@@ -63,18 +85,36 @@ function setupCamera(){
         2000
     );
 
-    // Initial 3rd person camera position (behind and above the elf at origin)
-    // Elf starts at (0, 0, 0) facing +z direction, so camera should be behind (negative z)
     const cameraDistance = 8;
     const cameraHeight = 5;
     camera.position.set(0, cameraHeight, -cameraDistance);
-    camera.lookAt(0, 1, 3); // Look slightly ahead of the elf
+    camera.lookAt(0, 1, 3);
 
     return camera;
 }
 
+/**
+ * Updates the camera position and orientation to follow the elf character from a third-person perspective.
+ *
+ * This function positions the camera behind and above the elf, maintaining a fixed distance and height 
+ * relative to the elf's current position and facing direction (rotation.y). The camera "looks at" a point 
+ * slightly ahead of the elf, with vertical adjustment based on the current camera pitch
+ * (controlled elsewhere, e.g. via user input to look up/down).
+ *
+ * If the elf object is not yet assigned, attempts to find the elf in the scene by name.
+ * If the elf cannot be found, the function returns early.
+ * 
+ * Camera placement:
+ *   - The camera is placed behind the elf at a specified distance (cameraDistance) and above (cameraHeight).
+ *   - The look direction is calculated by projecting a point ahead of the elf, with pitch applied to the Y axis.
+ *
+ * Global dependencies:
+ *   - Uses `elf`, `scene`, and `camera` objects in global scope.
+ *   - Uses `cameraPitch` global variable for vertical look adjustment.
+ * 
+ * No parameters. Camera is updated in-place (side effect function).
+ */
 export function followElf(){
-    // Follow the elf with a 3rd person camera perspective
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
     }
@@ -83,36 +123,44 @@ export function followElf(){
         return;
     }
     
-    // Camera settings for 3rd person view
-    const cameraDistance = 8; // Distance behind the elf
-    const cameraHeight = 5; // Height above the elf
+    const cameraDistance = 8;
+    const cameraHeight = 5;
     
-    // Get the elf's facing direction from rotation.y
-    // rotation.y = 0 means facing +z, Math.PI means facing -z, etc.
     const facingAngle = elf.rotation.y;
     
-    // Calculate position behind the elf (opposite to facing direction)
     const cameraX = elf.position.x - Math.sin(facingAngle) * cameraDistance;
     const cameraZ = elf.position.z - Math.cos(facingAngle) * cameraDistance;
     const cameraY = elf.position.y + cameraHeight;
     
-    // Update camera position
     camera.position.set(cameraX, cameraY, cameraZ);
     
-    // Look at a point slightly ahead of the elf in the direction it's facing
-    // Apply camera pitch (up/down look) to the look target
     const lookAheadDistance = 3;
     const lookX = elf.position.x + Math.sin(facingAngle) * lookAheadDistance;
     const lookZ = elf.position.z + Math.cos(facingAngle) * lookAheadDistance;
-    const baseLookY = elf.position.y + 1; // Look slightly above the elf's base
+    const baseLookY = elf.position.y + 1;
     
-    // Apply pitch offset (vertical look adjustment)
-    const pitchOffset = Math.sin(cameraPitch) * 5; // Scale the pitch effect
+    const pitchOffset = Math.sin(cameraPitch) * 5;
     const lookY = baseLookY + pitchOffset;
     
     camera.lookAt(lookX, lookY, lookZ);
 }
 
+/**
+ * Sets up the main lighting for the outdoor scene.
+ *
+ * This function adds two primary types of lights to the scene:
+ *   1. AmbientLight: Provides a soft, uniform white light to brighten all objects and reduce harsh shadows.
+ *   2. DirectionalLight: Simulates sunlight by producing parallel light rays from above, casting realistic shadows.
+ *
+ * Shadow Configuration:
+ *   - The DirectionalLight is configured to cast shadows.
+ *   - The shadow map size is increased (2048x2048) for higher quality shadows.
+ *   - The shadow camera's bounds (near, far, left, right, top, bottom) are set to cover a large area (the whole ground and more).
+ *   - The directional light's target is set at the origin to illuminate the scene center.
+ *
+ * This function assumes global access to the THREE, scene objects.
+ * No parameters; lights are added to the global scene as a side effect.
+ */
 function setupLights(){
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // soft white light
     scene.add(ambientLight);
