@@ -2776,23 +2776,51 @@ export function pickUpSnowball(){
     }
     
     if (!elf) {
+        console.warn('Elf not found, cannot pick up snowball');
         return null;
     }
     
+    // Remove any existing snowball in hand
+    const existingSnowball = elf.children.find(child => child.name === 'snowballInHand');
+    if (existingSnowball) {
+        elf.remove(existingSnowball);
+    }
+    
     const snowball = createSnowball();
+    snowball.name = 'snowballInHand';
+    snowball.castShadow = true;
+    snowball.receiveShadow = true;
     
-    // Position relative to elf group (local coordinates)
-    // Since the snowball is a child of the elf, it will move and rotate with the elf
-    const handOffset = 0.8; // Height offset for hand position (local Y)
-    const forwardOffset = 0.5; // Distance in front of elf (local Z)
-    const sideOffset = 3; // Slight offset to the right (local X)
+    // Make snowball bigger so it's more visible
+    snowball.scale.setScalar(2);
     
-    // Set position in elf's local coordinate system
-    // X = right, Y = up, Z = forward
-    snowball.position.set(3, 0.8, 0.5);
+    // Calculate world position for snowball based on elf's position and rotation
+    const handOffset = 1.5; // Height offset for hand position
+    const forwardOffset = 1.0; // Distance in front of elf
+    const sideOffset = 0.5; // Slight offset to the right
     
-    // Add snowball to elf group (not scene) so it moves with the elf
-    elf.add(snowball);
+    // Calculate position based on elf's rotation
+    const elfRotation = elf.rotation.y;
+    const forwardX = Math.sin(elfRotation) * forwardOffset;
+    const forwardZ = Math.cos(elfRotation) * forwardOffset;
+    const rightX = Math.sin(elfRotation + Math.PI / 2) * sideOffset;
+    const rightZ = Math.cos(elfRotation + Math.PI / 2) * sideOffset;
+    
+    // World position relative to elf
+    const worldX = elf.position.x + forwardX + rightX;
+    const worldY = elf.position.y + handOffset;
+    const worldZ = elf.position.z + forwardZ + rightZ;
+    
+    // Set world position
+    snowball.position.set(worldX, worldY, worldZ);
+    
+    // Add snowball to scene first to test visibility
+    scene.add(snowball);
+    
+    console.log('Snowball added to scene at world position:', snowball.position);
+    console.log('Elf world position:', elf.position);
+    console.log('Elf rotation:', elf.rotation.y);
+    console.log('Snowball scale:', snowball.scale);
     
     return snowball;
 }
