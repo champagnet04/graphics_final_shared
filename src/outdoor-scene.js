@@ -1256,25 +1256,43 @@ function createIcyPond() {
     pond = circle;
 }
 
-function createNorthernLights() {
-    // Create a half dome (hemisphere) geometry
-    const radius = 2000;  // Large radius to cover the whole sky
-    const widthSegments = 64;  // Horizontal segments
-    const heightSegments = 32;  // Vertical segments
+/**
+ * Creates and returns the geometry for the northern lights (aurora) effect.
+ * 
+ * The geometry is a hemisphere (half-sphere) that covers the sky above the scene.
+ * It uses a large radius to create a dome effect, with sufficient segments for
+ * smooth rendering. Vertex normals are computed for proper lighting calculations.
+ * 
+ * @returns {THREE.SphereGeometry} The hemisphere geometry for the northern lights
+ */
+function createAuroraGeom() {
+    const radius = 2000;
+    const widthSegments = 64;
+    const heightSegments = 32;
     const geometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments, 0, Math.PI * 2, 0, Math.PI / 2);
     
-    // The geometry is already a hemisphere (top half of sphere)
     geometry.computeVertexNormals();
     
-    // STEP 2: Create the Shader Material
-    // This is where the magic happens - animating colors
-    
-    const material = new THREE.ShaderMaterial({
+    return geometry;
+}
+
+/**
+ * Creates and returns the shader material for the northern lights (aurora) effect.
+ * 
+ * The material uses custom vertex and fragment shaders to create an animated,
+ * flowing aurora effect with multiple color layers. It includes uniforms for time
+ * (for animation) and three color values that blend together to create the aurora
+ * appearance. The material is transparent with additive blending to create a glowing effect.
+ * 
+ * @returns {THREE.ShaderMaterial} The shader material configured for the northern lights
+ */
+function createAuroraMaterial() {
+    return new THREE.ShaderMaterial({
         uniforms: {
             time: { value: 0.0 },
-            color1: { value: new THREE.Color(0x00ff88) }, // Green
-            color2: { value: new THREE.Color(0x0088ff) }, // Blue
-            color3: { value: new THREE.Color(0x8800ff) }, // Purple
+            color1: { value: new THREE.Color(0x00ff88) },
+            color2: { value: new THREE.Color(0x0088ff) },
+            color3: { value: new THREE.Color(0x8800ff) },
         },
         vertexShader: `
             varying vec2 vUv;
@@ -1295,35 +1313,24 @@ function createNorthernLights() {
             varying vec2 vUv;
             varying vec3 vPosition;
             
-            // Noise function for organic movement
             float noise(vec2 p) {
                 return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
             }
             
             void main() {
-                // Create flowing waves
                 float wave1 = sin(vUv.x * 3.0 + time * 0.5) * 0.5 + 0.5;
                 float wave2 = sin(vUv.x * 5.0 - time * 0.3) * 0.5 + 0.5;
                 float wave3 = sin(vUv.x * 7.0 + time * 0.7) * 0.5 + 0.5;
                 
-                // Combine waves for complex pattern
                 float pattern = wave1 * 0.5 + wave2 * 0.3 + wave3 * 0.2;
                 
-                // Fade out at top (zenith) - keep it visible at the top
                 float topFade = smoothstep(0.0, 0.2, vUv.y);
-                
-                // Fade out at bottom (horizon) - make it fade more aggressively so midnight color shows
-                // vUv.y goes from 0 (bottom/horizon) to 1 (top/zenith) for a hemisphere
-                float bottomFade = smoothstep(0.0, 0.5, vUv.y); // Fade from 0 to 0.5, so bottom half fades out
-                
-                // Fade out at horizontal edges
+                float bottomFade = smoothstep(0.0, 0.5, vUv.y);
                 float horizontalFade = smoothstep(0.0, 0.2, vUv.x) * smoothstep(1.0, 0.8, vUv.x);
                 
-                // Mix colors based on pattern
                 vec3 finalColor = mix(color1, color2, pattern);
                 finalColor = mix(finalColor, color3, wave3);
                 
-                // Calculate opacity with fading - stronger fade at bottom to show midnight color
                 float opacity = pattern * topFade * bottomFade * horizontalFade * 0.6;
                 
                 gl_FragColor = vec4(finalColor, opacity);
@@ -1332,14 +1339,28 @@ function createNorthernLights() {
         transparent: true,
         side: THREE.DoubleSide,
         depthWrite: false,
-        blending: THREE.AdditiveBlending // Makes it glow!
+        blending: THREE.AdditiveBlending
     });
+}
+
+/**
+ * Creates and adds the Northern Lights effect (aurora borealis) mesh to the scene.
+ * This function constructs a mesh using a custom geometry and material to simulate
+ * the appearance of auroras. The resulting mesh is positioned at the origin and
+ * stored in the global `northernLights` variable. The mesh is then added to the `scene`.
+ * 
+ * Dependencies:
+ * - createAuroraGeom(): Returns the geometry for the aurora.
+ * - createAuroraMaterial(): Returns the material (shader material) for the aurora.
+ * - `scene`: The THREE.Scene instance to which the aurora mesh will be added.
+ * - `northernLights`: Global variable to reference the aurora mesh instance.
+ */
+function createNorthernLights() {
+    const geometry = createAuroraGeom();
+    const material = createAuroraMaterial();
     
     const aurora = new THREE.Mesh(geometry, material);
     
-    // Position the hemisphere so its bottom edge is at ground level (y=0)
-    // The hemisphere is the top half of a sphere, so position it at y=0
-    // This makes the bottom edge of the hemisphere at y=0 (ground level)
     aurora.position.set(0, 0, 0);
     
     northernLights = aurora;
