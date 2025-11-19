@@ -51,6 +51,19 @@ const lightColors = [
     0xffa500
 ];
 
+const holidayGreetings = [
+    "Happy Holidays!",
+    "Season's Greetings!",
+    "Warmest Wishes!",
+    "'Tis the Season!",
+    "Peace and Love to You!",
+    "Merry Christmas!",
+    "Happy New Year!",
+    "Have a Holly Jolly Christmas!",
+    "It's the Most Wonderful Time of the Year!",
+    "Hello, my name is Frosty!"
+]
+
 
 
 /**
@@ -1708,6 +1721,7 @@ function createSnowman(x, z) {
     snowmanGroup.add(createSnowmanButtons());
     snowmanGroup.position.set(x, getHeightAt(x, z), z);
     scene.add(snowmanGroup);
+    //snowmanGroup.greeting = holidayGreetings[Math.floor(Math.random() * holidayGreetings.length)];
     return snowmanGroup;
 }
 
@@ -2678,6 +2692,36 @@ async function addCandyToPath(path){
     
     scene.add(candies);
     return candies;
+}
+
+/**
+ * Makes a snowman speak a random holiday greeting using the Web Speech API.
+ * 
+ * This function selects a random greeting from the holidayGreetings array and
+ * uses the browser's speech synthesis to speak it. The voice, rate, pitch, and
+ * volume are configured for a natural-sounding greeting.
+ * 
+ * @export
+ * @function
+ */
+export function makeSnowmanSpeak(){
+    const greeting = holidayGreetings[Math.floor(Math.random() * holidayGreetings.length)];
+    const speech = new SpeechSynthesisUtterance(greeting);
+    
+    const voices = speechSynthesis.getVoices();
+    const preferredVoice = voices.find(voice => 
+        voice.lang.includes('en') && (voice.name.includes('Male') || voice.name.includes('Fred'))
+    ) || voices.find(voice => voice.lang.includes('en')) || voices[0];
+    
+    if (preferredVoice) {
+        speech.voice = preferredVoice;
+    }
+    
+    speech.rate = 0.9;
+    speech.pitch = 1.0;
+    speech.volume = 1.0;
+    
+    speechSynthesis.speak(speech);
 }
 
 export async function setupOutdoorScene(){    
