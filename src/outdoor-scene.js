@@ -274,10 +274,12 @@ function createGround(){
     modifyTerrainHeights(groundGeometry);
 
     ground = new THREE.Mesh(groundGeometry, snowMaterial);
+    ground.name = 'ground'; // Add name for identification
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
     ground.castShadow = true;
     ground.receiveShadow = true;
+    ground.visible = true; // Ensure it's visible
     scene.add(ground);
 }
 
@@ -2744,7 +2746,40 @@ export function makeSnowmanSpeak(){
 }
 
 function createSnowball(){
-    const snowball = new THREE.Mesh(ballGeometry, snowMaterial);
+    // Create geometry with morph targets
+    const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+    
+    // Create morph target (flattened splat)
+    const positionAttribute = geometry.attributes.position;
+    const morphPositions = [];
+    
+    for (let i = 0; i < positionAttribute.count; i++) {
+        const x = positionAttribute.getX(i);
+        const y = positionAttribute.getY(i);
+        const z = positionAttribute.getZ(i);
+        
+        // Flatten by compressing Y and expanding X/Z
+        const flatteningFactor = 3;
+        const newY = y * 0.1;
+        const newX = x * flatteningFactor;
+        const newZ = z * flatteningFactor;
+        
+        morphPositions.push(newX, newY, newZ);
+    }
+    
+    // Add morph target to geometry
+    geometry.morphAttributes.position = [
+        new THREE.Float32BufferAttribute(morphPositions, 3)
+    ];
+    
+    // Clone the material so each snowball has its own instance
+    // This prevents modifying one snowball's material from affecting all snow objects
+    const snowballMaterial = snowMaterial.clone();
+    const snowball = new THREE.Mesh(geometry, snowballMaterial);
+    
+    // Initialize morph target influences
+    snowball.morphTargetInfluences = [0];
+    
     return snowball;
 }
 
@@ -3069,31 +3104,29 @@ export function updateSnowballThrow(){
     
     const { snowball, path, impactT, speed } = snowballThrowAnimation;
     
-    // Update current position along path
-    snowballThrowAnimation.currentT += speed;
-    
-    // Clamp to impact point
-    if (snowballThrowAnimation.currentT >= impactT) {
-        snowballThrowAnimation.currentT = impactT;
-    }
-    
-    // Get position along path at current t
-    const currentPoint = path.getPoint(snowballThrowAnimation.currentT);
-    snowball.position.copy(currentPoint);
-    
     // Check if reached impact point
     if (snowballThrowAnimation.currentT >= impactT) {
-        // Animation complete - morph and play sound
-        morphSnowballIntoSplat();
-        makeSplatSound();
+        // Clamp to impact point and stop moving
+        snowballThrowAnimation.currentT = impactT;
+        const currentPoint = path.getPoint(impactT);
+        snowball.position.copy(currentPoint);
         
-        // Remove snowball from scene
-        if (snowball && snowball.parent) {
-            snowball.parent.remove(snowball);
+        // Only trigger morph once
+        if (!snowballThrowAnimation.morphTriggered) {
+            snowballThrowAnimation.morphTriggered = true;
+            // Animation complete - morph and play sound
+            morphSnowballIntoSplat();
+            makeSplatSound();
         }
+        // Don't remove snowball here - let morphSnowballIntoSplat() and fadeOutSplat() handle that
+        // The animation state will be cleared when the snowball is fully removed
+    } else {
+        // Update current position along path
+        snowballThrowAnimation.currentT += speed;
         
-        // Clear animation state
-        snowballThrowAnimation = null;
+        // Get position along path at current t
+        const currentPoint = path.getPoint(snowballThrowAnimation.currentT);
+        snowball.position.copy(currentPoint);
     }
 }
 
@@ -3130,9 +3163,27 @@ function checkSnowballHit(path){
             raycaster.set(currentPoint, direction);
             
             // Check for intersections with scene objects and ground
-            const intersects = raycaster.intersectObjects(objectsToCheck, true);
+            // Check objects individually to avoid issues with skinned meshes
+            let intersects = [];
+            try {
+                // Try to intersect all objects at once first (faster)
+                intersects = raycaster.intersectObjects(objectsToCheck, true);
+            } catch (error) {
+                // If error occurs (e.g., with skinned meshes), check objects individually
+                for (const obj of objectsToCheck) {
+                    try {
+                        const objIntersects = raycaster.intersectObject(obj, true);
+                        intersects.push(...objIntersects);
+                    } catch (e) {
+                        // Skip objects that cause errors (likely skinned meshes)
+                        continue;
+                    }
+                }
+            }
             
             if (intersects.length > 0) {
+                // Sort by distance to get closest hit
+                intersects.sort((a, b) => a.distance - b.distance);
                 // Found a hit - return the hit position and t value
                 const hitPoint = intersects[0].point;
                 return { point: hitPoint, t: t };
@@ -3155,7 +3206,84 @@ function checkSnowballHit(path){
 }
 
 function morphSnowballIntoSplat(){
+    if (!snowballThrowAnimation) {
+        return;
+    }
+    
+    const { snowball } = snowballThrowAnimation;
+    
+    // Store reference to snowball in case animation state is cleared
+    if (!snowball) {
+        return;
+    }
+    
+    // The morph target should already exist from createSnowball()
+    if (!snowball.morphTargetInfluences || snowball.morphTargetInfluences.length === 0) {
+        console.warn('Snowball has no morph targets');
+        return;
+    }
+    
+    // Animate the morph
+    const morphStartTime = Date.now();
+    const morphDuration = 150;
+    
+    function animateMorph() {
+        // Check if snowball still exists
+        if (!snowball || !snowball.parent) {
+            return;
+        }
+        
+        const elapsed = Date.now() - morphStartTime;
+        const progress = Math.min(elapsed / morphDuration, 1);
+        
+        // Ease-out curve
+        const eased = 1 - Math.pow(1 - progress, 3);
+        snowball.morphTargetInfluences[0] = eased;
+        
+        if (progress < 1) {
+            requestAnimationFrame(animateMorph);
+        } else {
+            // Fade out after morph completes
+            setTimeout(() => {
+                fadeOutSplat(snowball);
+            }, 2000);
+        }
+    }
+    
+    animateMorph();
+}
 
+function fadeOutSplat(splat) {
+    const fadeStartTime = Date.now();
+    const fadeDuration = 500;
+    
+    function fade() {
+        const elapsed = Date.now() - fadeStartTime;
+        const progress = Math.min(elapsed / fadeDuration, 1);
+        
+        splat.material.opacity = 1 - progress;
+        splat.material.transparent = true;
+        
+        if (progress < 1) {
+            requestAnimationFrame(fade);
+        } else {
+            // Fade complete - remove snowball from scene and clear animation state
+            if (splat && splat.parent) {
+                splat.parent.remove(splat);
+            }
+            // Dispose of the geometry and material to free memory
+            if (splat.geometry) {
+                splat.geometry.dispose();
+            }
+            if (splat.material) {
+                splat.material.dispose();
+            }
+            // Clear animation state
+            snowballThrowAnimation = null;
+        }
+    }
+    
+    fade();
 }
 
 function makeSplatSound(){
