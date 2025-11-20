@@ -29,6 +29,14 @@ const treeMaterial = new THREE.MeshStandardMaterial({
     side: THREE.DoubleSide
 });
 
+const wallMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    side: THREE.DoubleSide,
+    map: loadWallTexture(),
+    transparent: true,
+    opacity: 0.7
+});
+
 let sceneObjects = [];
 let audioListener = null;
 let fireCrackleSound = null;
@@ -3583,6 +3591,163 @@ function makeSplatSound() {
     );
 }
 
+function loadWallTexture(){
+    const loader = new THREE.TextureLoader();
+    const wallTexture = loader.load(
+        '/textures/mountains.webp',
+        (texture) => {
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(1, 1);
+        },
+        undefined,
+        (error) => {
+            console.error('Error loading wall texture:', error);
+        }
+    );
+    
+    wallTexture.wrapS = THREE.RepeatWrapping;
+    wallTexture.wrapT = THREE.RepeatWrapping;
+    wallTexture.repeat.set(1, 1);
+    
+    return wallTexture;
+}
+
+function createWall(wallCorners) {
+    // wallCorners is an array of 2 Vector3 points at ground level (y=0)
+    const corner1 = wallCorners[0];
+    const corner2 = wallCorners[1];
+    
+    // Calculate the width of the wall (distance between the two corners)
+    const wallWidth = corner1.distanceTo(corner2);
+    
+    // Set wall height (half of the max height from groundBounds)
+    const wallHeight = 25;
+    
+    // Create the wall geometry
+    const wallGeometry = new THREE.PlaneGeometry(wallWidth, wallHeight);
+    const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+    
+    // Calculate the midpoint between the two corners
+    const midpoint = new THREE.Vector3();
+    midpoint.addVectors(corner1, corner2);
+    midpoint.multiplyScalar(0.5);
+    
+    // Position the wall at the midpoint, with the bottom at ground level
+    wallMesh.position.set(midpoint.x, wallHeight / 2 - 5, midpoint.z);
+    
+    // Calculate the direction vector along the wall (from corner1 to corner2)
+    const wallDirection = new THREE.Vector3();
+    wallDirection.subVectors(corner2, corner1);
+    wallDirection.normalize();
+    
+    // Calculate the outward direction (from scene center to midpoint)
+    const outwardDirection = new THREE.Vector3();
+    outwardDirection.copy(midpoint);
+    outwardDirection.normalize();
+    
+    // Calculate the normal to the wall (perpendicular to wallDirection, pointing outward)
+    // The wall should be perpendicular to the line between corners and face outward
+    const wallNormal = new THREE.Vector3();
+    wallNormal.crossVectors(wallDirection, new THREE.Vector3(0, 1, 0));
+    
+    // Determine which direction is outward by checking the dot product with outwardDirection
+    if (wallNormal.dot(outwardDirection) < 0) {
+        wallNormal.negate();
+    }
+    
+    // Calculate rotation angle to face the wall outward
+    const angle = Math.atan2(wallNormal.x, wallNormal.z);
+    wallMesh.rotation.y = angle;
+    
+    // Set shadow properties
+    wallMesh.castShadow = true;
+    wallMesh.receiveShadow = true;
+    
+    return wallMesh;
+}
+
+function determineWallCorners(){
+    const groundCorners = [];
+    const frontLeftCorner = new THREE.Vector3(groundBounds.xMin, 0, groundBounds.zMin);
+    const frontRightCorner = new THREE.Vector3(groundBounds.xMax, 0, groundBounds.zMin);
+    const backLeftCorner = new THREE.Vector3(groundBounds.xMin, 0, groundBounds.zMax);
+    const backRightCorner = new THREE.Vector3(groundBounds.xMax, 0, groundBounds.zMax);
+
+    groundCorners.push(frontLeftCorner);
+    groundCorners.push(frontRightCorner);
+    groundCorners.push(backLeftCorner);
+    groundCorners.push(backRightCorner);
+
+    return groundCorners;
+}
+
+function determineFrontWallBounds(){
+    const wallCorners = determineWallCorners();
+    const frontWallCorners = [];
+    const frontLeftCorner = wallCorners[0];
+    const frontRightCorner = wallCorners[1];
+    frontWallCorners.push(frontLeftCorner);
+    frontWallCorners.push(frontRightCorner);
+    return frontWallCorners;
+    //all are gonna have the same height, so do that in later function?
+}
+
+function determineBackWallBounds(){
+    const wallCorners = determineWallCorners();
+    const backWallCorners = [];
+    const backLeftCorner = wallCorners[2];
+    const backRightCorner = wallCorners[3];
+    backWallCorners.push(backLeftCorner);
+    backWallCorners.push(backRightCorner);
+    return backWallCorners;
+    //all are gonna have the same height, so do that in later function?
+}
+
+function determineLeftWallBounds(){
+    const wallCorners = determineWallCorners();
+    const leftWallCorners = [];
+    const leftFrontCorner = wallCorners[0];
+    const leftBackCorner = wallCorners[2];
+    leftWallCorners.push(leftFrontCorner);
+    leftWallCorners.push(leftBackCorner);
+    return leftWallCorners;
+    //all are gonna have the same height, so do that in later function?
+}
+
+function determineRightWallBounds(){
+    const wallCorners = determineWallCorners();
+    const rightWallCorners = [];
+    const rightFrontCorner = wallCorners[1];
+    const rightBackCorner = wallCorners[3];
+    rightWallCorners.push(rightFrontCorner);
+    rightWallCorners.push(rightBackCorner);
+    return rightWallCorners;
+    //all are gonna have the same height, so do that in later function?
+}
+
+function generateWalls(){
+    const frontWall = createWall(determineFrontWallBounds());
+    const backWall = createWall(determineBackWallBounds());
+    const leftWall = createWall(determineLeftWallBounds());
+    const rightWall = createWall(determineRightWallBounds());
+    scene.add(frontWall);
+    scene.add(backWall);
+    scene.add(leftWall);
+    scene.add(rightWall);
+}
+
+/*
+const groundBounds = {
+    xMin: -100,
+    xMax: 100,
+    zMin: -50,
+    zMax: 50,
+    yMin: -10,
+    yMax: 100
+};
+*/
+
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
@@ -3599,6 +3764,7 @@ export async function setupOutdoorScene(){
     initKeyboardListeners();
     createNorthernLights();
     createSnowballPile();
+    generateWalls();
     await addCandyToPath(createPath());
     console.log('Scene setup complete');
     return { scene, camera };
