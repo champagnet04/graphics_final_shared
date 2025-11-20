@@ -2988,12 +2988,35 @@ function createThrowPath(mouseX, mouseY){
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
     
-    // Intersect with ground to get target position
-    const intersects = raycaster.intersectObject(ground, false);
-    let targetPos;
+    // First check for intersections with scene objects (house, trees, snowmen, etc.)
+    const objectsToCheck = sceneObjects.filter(obj => obj instanceof THREE.Object3D);
+    let intersects = [];
     
+    // Check objects individually to avoid issues with skinned meshes
+    for (const obj of objectsToCheck) {
+        try {
+            const objIntersects = raycaster.intersectObject(obj, true);
+            intersects.push(...objIntersects);
+        } catch (e) {
+            // Skip objects that cause errors (likely skinned meshes)
+            continue;
+        }
+    }
+    
+    // Also check ground
+    if (ground) {
+        try {
+            const groundIntersects = raycaster.intersectObject(ground, false);
+            intersects.push(...groundIntersects);
+        } catch (e) {
+            // Skip if error
+        }
+    }
+    
+    let targetPos;
     if (intersects.length > 0) {
-        // Use intersection point with ground
+        // Sort by distance to get closest intersection (the object/ground you clicked on)
+        intersects.sort((a, b) => a.distance - b.distance);
         targetPos = intersects[0].point;
     } else {
         // If no intersection, project to a far distance
@@ -3061,16 +3084,6 @@ export function throwSnowball(x, y){
         return;
     }
     
-    const hitResult = checkSnowballHit(path);
-    if (!hitResult) {
-        return;
-    }
-    
-    // Ensure impactT is at least a minimum value to allow visible animation
-    // This ensures the snowball animates for at least a few frames
-    const minImpactT = 0.15; // Minimum 15% of path (about 7-8 frames at speed 0.02)
-    const impactT = Math.max(hitResult.t, minImpactT);
-    
     // Get snowball's current world position as starting point
     const startPos = new THREE.Vector3();
     snowball.getWorldPosition(startPos);
@@ -3085,14 +3098,14 @@ export function throwSnowball(x, y){
     scene.add(snowball);
     snowball.position.copy(startPos);
     
-    // Set up animation state
+    // Set up animation state - collision will be detected in real-time during update
     snowballThrowAnimation = {
         snowball: snowball,
         path: path,
-        impactT: impactT,
         currentT: 0,
         speed: 0.02, // How fast to move along the path (t value per frame)
-        originalParent: originalParent // Store in case we need to restore
+        originalParent: originalParent, // Store in case we need to restore
+        morphTriggered: false // Track if morph has been triggered
     };
 }
 
@@ -3111,32 +3124,108 @@ export function updateSnowballThrow(){
         return;
     }
     
-    const { snowball, path, impactT, speed } = snowballThrowAnimation;
+    const { snowball, path, speed } = snowballThrowAnimation;
     
-    // Check if reached impact point
-    if (snowballThrowAnimation.currentT >= impactT) {
-        // Clamp to impact point and stop moving
-        snowballThrowAnimation.currentT = impactT;
-        const currentPoint = path.getPoint(impactT);
-        snowball.position.copy(currentPoint);
-        
-        // Only trigger morph once
-        if (!snowballThrowAnimation.morphTriggered) {
-            snowballThrowAnimation.morphTriggered = true;
-            // Animation complete - morph and play sound
-            morphSnowballIntoSplat();
-            makeSplatSound();
-        }
-        // Don't remove snowball here - let morphSnowballIntoSplat() and fadeOutSplat() handle that
-        // The animation state will be cleared when the snowball is fully removed
+    // Check if morph has already been triggered
+    if (snowballThrowAnimation.morphTriggered) {
+        // Already hit something, don't move anymore
+        return;
+    }
+    
+    // Update current position along path
+    snowballThrowAnimation.currentT += speed;
+    
+    // Clamp to end of path
+    if (snowballThrowAnimation.currentT > 1) {
+        snowballThrowAnimation.currentT = 1;
+    }
+    
+    // Get previous and current positions
+    const previousT = Math.max(0, snowballThrowAnimation.currentT - speed);
+    const previousPoint = path.getPoint(previousT);
+    const currentPoint = path.getPoint(snowballThrowAnimation.currentT);
+    
+    // Check for real-time collision along the movement vector
+    const hitResult = checkSnowballCollisionAlongPath(previousPoint, currentPoint);
+    
+    if (hitResult) {
+        // Hit something! Stop moving and trigger morph
+        snowball.position.copy(hitResult.point);
+        snowballThrowAnimation.morphTriggered = true;
+        snowballThrowAnimation.impactPoint = hitResult.point;
+        // Animation complete - morph (sound will play inside morphSnowballIntoSplat)
+        morphSnowballIntoSplat();
     } else {
-        // Update current position along path
-        snowballThrowAnimation.currentT += speed;
-        
-        // Get position along path at current t
-        const currentPoint = path.getPoint(snowballThrowAnimation.currentT);
+        // No collision, update position
         snowball.position.copy(currentPoint);
     }
+}
+
+/**
+ * Checks if the snowball collides with any scene objects while moving from previous to current position.
+ * 
+ * @param {THREE.Vector3} previousPosition - The snowball's previous position
+ * @param {THREE.Vector3} currentPosition - The snowball's current position
+ * @returns {Object|null} - Returns { point: hitPoint } if collision detected, null otherwise
+ */
+function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
+    const snowballRadius = 0.3;
+    const raycaster = new THREE.Raycaster();
+    
+    // Get all objects to check for collisions
+    const objectsToCheck = sceneObjects.filter(obj => obj instanceof THREE.Object3D);
+    if (ground) {
+        objectsToCheck.push(ground);
+    }
+    
+    // Calculate movement direction and distance
+    const direction = new THREE.Vector3().subVectors(currentPosition, previousPosition);
+    const distance = direction.length();
+    
+    if (distance === 0) {
+        return null;
+    }
+    
+    direction.normalize();
+    
+    // Cast ray from previous position along movement direction
+    raycaster.set(previousPosition, direction);
+    
+    let intersects = [];
+    try {
+        intersects = raycaster.intersectObjects(objectsToCheck, true);
+    } catch (error) {
+        // If error, check objects individually
+        for (const obj of objectsToCheck) {
+            try {
+                const objIntersects = raycaster.intersectObject(obj, true);
+                intersects.push(...objIntersects);
+            } catch (e) {
+                continue;
+            }
+        }
+    }
+    
+    if (intersects.length > 0) {
+        // Sort by distance to get closest hit
+        intersects.sort((a, b) => a.distance - b.distance);
+        const closestHit = intersects[0];
+        
+        // Check if the hit is within the movement distance (accounting for snowball radius)
+        // The hit should be at least one radius away from the start
+        if (closestHit.distance >= snowballRadius && closestHit.distance <= distance + snowballRadius) {
+            return { point: closestHit.point };
+        }
+    }
+    
+    // Also check ground height at current position
+    const groundHeight = getHeightAt(currentPosition.x, currentPosition.z);
+    if (currentPosition.y <= groundHeight + snowballRadius) {
+        const groundHitPoint = new THREE.Vector3(currentPosition.x, groundHeight + snowballRadius, currentPosition.z);
+        return { point: groundHitPoint };
+    }
+    
+    return null;
 }
 
 function checkSnowballHit(path){
@@ -3210,8 +3299,42 @@ function checkSnowballHit(path){
         }
     }
     
+    // Check if the end point of the path is on an object
+    const endPoint = path.getPoint(1);
+    const endRaycaster = new THREE.Raycaster();
+    // Cast a short ray from slightly before the end point to the end point
+    const checkStart = path.getPoint(0.99);
+    const checkDirection = new THREE.Vector3().subVectors(endPoint, checkStart).normalize();
+    endRaycaster.set(checkStart, checkDirection);
+    
+    let endIntersects = [];
+    try {
+        endIntersects = endRaycaster.intersectObjects(objectsToCheck, true);
+    } catch (error) {
+        // If error, check objects individually
+        for (const obj of objectsToCheck) {
+            try {
+                const objIntersects = endRaycaster.intersectObject(obj, true);
+                endIntersects.push(...objIntersects);
+            } catch (e) {
+                continue;
+            }
+        }
+    }
+    
+    if (endIntersects.length > 0) {
+        // Sort by distance and check if the hit is close to the end point
+        endIntersects.sort((a, b) => a.distance - b.distance);
+        const hitDistance = endIntersects[0].distance;
+        const endPointDistance = checkStart.distanceTo(endPoint);
+        // If the hit is before or at the end point, use it
+        if (hitDistance <= endPointDistance + snowballRadius) {
+            return { point: endIntersects[0].point, t: 1 };
+        }
+    }
+    
     // No hit found - return the end of the path
-    return { point: path.getPoint(1), t: 1 };
+    return { point: endPoint, t: 1 };
 }
 
 function morphSnowballIntoSplat(){
@@ -3231,6 +3354,9 @@ function morphSnowballIntoSplat(){
         console.warn('Snowball has no morph targets');
         return;
     }
+    
+    // Play splat sound when morph starts
+    makeSplatSound();
     
     // Animate the morph
     const morphStartTime = Date.now();
@@ -3296,7 +3422,29 @@ function fadeOutSplat(splat) {
 }
 
 function makeSplatSound(){
-
+    if (!audioListener) {
+        audioListener = new THREE.AudioListener();
+        camera.add(audioListener);
+    }
+    
+    const splatSound = new THREE.Audio(audioListener);
+    const audioLoader = new THREE.AudioLoader();
+    
+    audioLoader.load(
+        '/sounds/splat.mp3',
+        function(buffer) {
+            splatSound.setBuffer(buffer);
+            splatSound.setVolume(0.7);
+            splatSound.setLoop(false);
+            
+            // Resume audio context and play
+            resumeAudioContext();
+            splatSound.play();
+        },
+        function(error) {
+            console.error('Error loading splat sound:', error);
+        }
+    );
 }
 
 export async function setupOutdoorScene(){    
