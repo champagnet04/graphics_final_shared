@@ -2439,6 +2439,14 @@ export function checkCampfireProximity() {
         return;
     }
     
+    // Get the elfGroup (parent of elf, or use global if available)
+    if (!elfGroup) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) {
+        return;
+    }
+    
     if (!campfireGroup) {
         campfireGroup = scene.children.find(child => child.name === 'campfireGroup');
     }
@@ -2447,7 +2455,8 @@ export function checkCampfireProximity() {
         return;
     }
     
-    const distance = elf.position.distanceTo(campfireGroup.position);
+    // Use elfGroup position for distance calculation (elf is inside elfGroup)
+    const distance = elfGroup.position.distanceTo(campfireGroup.position);
     const proximityRadius = 30;
     
     if (distance <= proximityRadius) {
