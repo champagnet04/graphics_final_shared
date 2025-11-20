@@ -464,6 +464,28 @@ async function generateElfAtOrigin(){
  * @function moveElf
  */
 /**
+ * Checks if a position (x, z) is within the ground bounds.
+ * Accounts for the elf's collision radius to prevent going partially off the edge.
+ * 
+ * @param {number} x - The X coordinate to check
+ * @param {number} z - The Z coordinate to check
+ * @returns {boolean} True if the position is within bounds, false otherwise
+ */
+function checkGroundBounds(x, z) {
+    const collisionRadius = 0.5;
+    
+    // Check if position (accounting for collision radius) is within ground bounds
+    if (x - collisionRadius < groundBounds.xMin || x + collisionRadius > groundBounds.xMax) {
+        return false;
+    }
+    if (z - collisionRadius < groundBounds.zMin || z + collisionRadius > groundBounds.zMax) {
+        return false;
+    }
+    
+    return true;
+}
+
+/**
  * Checks if a position (x, z) would collide with any scene objects.
  * Excludes ground and pond.
  * 
@@ -624,14 +646,23 @@ export function moveElf(){
     }
     
     try {
+        // First check if the new position is within ground bounds
+        if (!checkGroundBounds(newX, newZ)) {
+            return; // Don't move if outside ground bounds
+        }
+        
+        // Then check for collisions with scene objects
         if (!checkElfCollision(newX, newZ)) {
             elfGroup.position.x = newX;
             elfGroup.position.z = newZ;
         }
     } catch (error) {
         console.error('Collision check error in moveElf:', error);
-        elfGroup.position.x = newX;
-        elfGroup.position.z = newZ;
+        // Only update position if within bounds even on error
+        if (checkGroundBounds(newX, newZ)) {
+            elfGroup.position.x = newX;
+            elfGroup.position.z = newZ;
+        }
     }
     
     elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
@@ -2577,14 +2608,19 @@ export function resumeAudioContext() {
  * @returns {void}
  */
 export function checkCampfireProximity() {
-    if (!elf || !audioListener || !fireCrackleSound) {
+    if (!elf) {
         return;
     }
     
-    // Get the elfGroup (parent of elf, or use global if available)
-    if (!elfGroup) {
-        elfGroup = elf.parent;
+    if (!audioListener) {
+        return;
     }
+    
+    if (!fireCrackleSound) {
+        return;
+    }
+    
+    // Use global elfGroup directly
     if (!elfGroup) {
         return;
     }
@@ -2603,11 +2639,18 @@ export function checkCampfireProximity() {
     
     if (distance <= proximityRadius) {
         resumeAudioContext();
-        if (!fireCrackleSound.isPlaying) {
-            fireCrackleSound.play();
+        // Check if the sound buffer is loaded before trying to play
+        if (fireCrackleSound.buffer) {
+            if (!fireCrackleSound.isPlaying) {
+                try {
+                    fireCrackleSound.play();
+                } catch (err) {
+                    console.error('Error playing fire crackle sound:', err);
+                }
+            }
         }
     } else {
-        if (fireCrackleSound.isPlaying) {
+        if (fireCrackleSound.buffer && fireCrackleSound.isPlaying) {
             fireCrackleSound.pause();
         }
     }
