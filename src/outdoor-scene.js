@@ -3613,7 +3613,7 @@ function loadWallTexture(){
     return wallTexture;
 }
 
-function createWall(wallCorners) {
+function createWall(wallCorners, wallName) {
     // wallCorners is an array of 2 Vector3 points at ground level (y=0)
     const corner1 = wallCorners[0];
     const corner2 = wallCorners[1];
@@ -3627,6 +3627,11 @@ function createWall(wallCorners) {
     // Create the wall geometry
     const wallGeometry = new THREE.PlaneGeometry(wallWidth, wallHeight);
     const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+    
+    // Set the wall name for identification
+    if (wallName) {
+        wallMesh.name = wallName;
+    }
     
     // Calculate the midpoint between the two corners
     const midpoint = new THREE.Vector3();
@@ -3727,14 +3732,20 @@ function determineRightWallBounds(){
 }
 
 function generateWalls(){
-    const frontWall = createWall(determineFrontWallBounds());
-    const backWall = createWall(determineBackWallBounds());
-    const leftWall = createWall(determineLeftWallBounds());
-    const rightWall = createWall(determineRightWallBounds());
+    const frontWall = createWall(determineFrontWallBounds(), 'frontWall');
+    const backWall = createWall(determineBackWallBounds(), 'backWall');
+    const leftWall = createWall(determineLeftWallBounds(), 'leftWall');
+    const rightWall = createWall(determineRightWallBounds(), 'rightWall');
     scene.add(frontWall);
     scene.add(backWall);
     scene.add(leftWall);
     scene.add(rightWall);
+    
+    // Add walls to sceneObjects for collision detection
+    sceneObjects.push(frontWall);
+    sceneObjects.push(backWall);
+    sceneObjects.push(leftWall);
+    sceneObjects.push(rightWall);
 }
 
 /*
