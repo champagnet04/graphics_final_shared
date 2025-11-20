@@ -344,14 +344,14 @@ function generateCloudPosition() {
             Math.random() * 100 - 50   // z: -50 to 50
         );
 
-        var tooClose = generateCloudPosition.pastPositions.some(pos =>
+        var tooClose = generateCloudPosition.pastPositions.some(pos => 
             pos.distanceTo(cloudPosition) < 5
         );
         attempt++;
     } while (tooClose && attempt < 100);
 
     generateCloudPosition.pastPositions.push(cloudPosition);
-
+    
     return cloudPosition;
 }
 
@@ -437,7 +437,7 @@ async function generateElfAtOrigin(){
         
         elfGroup.add(elf);
         scene.add(elfGroup);
-
+        
         return elf;
     } catch (error) {
         console.error('Cant load model:', error);
@@ -463,6 +463,109 @@ async function generateElfAtOrigin(){
  * @export
  * @function moveElf
  */
+/**
+ * Checks if a position (x, z) would collide with any scene objects.
+ * Excludes ground and pond.
+ * 
+ * @param {number} x - The X coordinate to check
+ * @param {number} z - The Z coordinate to check
+ * @returns {boolean} True if there would be a collision, false otherwise
+ */
+function checkElfCollision(x, z) {
+    try {
+        const collisionRadius = 0.5; // Collision radius around the elf (reduced from 1.0)
+        
+        // Get all 3D objects from sceneObjects
+        const objectsToCheck = sceneObjects.filter(obj => obj instanceof THREE.Object3D);
+        
+        // Also search the scene for collision objects
+        scene.traverse((child) => {
+            if (child instanceof THREE.Group) {
+                // Check for known collision objects
+                if (child.name === 'cottageGroup' || 
+                    child.name === 'snowmanGroup' || 
+                    (child.name && child.name.startsWith('treeGroup')) ||
+                    child.name === 'campfireGroup' ||
+                    child.name === 'logGroup') {
+                    if (!objectsToCheck.includes(child)) {
+                        objectsToCheck.push(child);
+                    }
+                }
+            }
+        });
+        
+        // Skip peppermint candies group for now - it's too large and would block all movement
+        // We could check individual candies later if needed
+        // scene.children.forEach((child) => {
+        //     if (child instanceof THREE.Group && child.children.length > 0) {
+        //         const hasPeppermint = child.children.some(c => c.name === 'peppermint');
+        //         if (hasPeppermint && !objectsToCheck.includes(child)) {
+        //             objectsToCheck.push(child);
+        //         }
+        //     }
+        // });
+        
+        for (const obj of objectsToCheck) {
+            // Skip the elf itself, snowball pile, ground, and pond
+            if (!obj || obj.name === 'elfGroup' || obj.name === 'snowballPile' || 
+                obj.name === 'ground' || obj === ground || obj === pond || obj === elfGroup) {
+                continue;
+            }
+            
+            if (obj.visible === false) {
+                continue;
+            }
+            
+            try {
+                // Get bounding box
+                const box = new THREE.Box3();
+                box.setFromObject(obj);
+                
+                if (box.isEmpty()) {
+                    continue;
+                }
+                
+                // Skip if bounding box is extremely large (likely ground, sky, or large groups)
+                const boxSize = box.getSize(new THREE.Vector3());
+                if (boxSize.x > 100 || boxSize.z > 100 || boxSize.y > 100) {
+                    continue;
+                }
+                
+                // Quick distance check - skip if object is too far away
+                const boxCenter = box.getCenter(new THREE.Vector3());
+                const distanceToCenter = Math.sqrt(
+                    Math.pow(x - boxCenter.x, 2) + Math.pow(z - boxCenter.z, 2)
+                );
+                const maxObjectRadius = Math.max(boxSize.x, boxSize.z) / 2;
+                // Only check objects within a reasonable distance (20 units)
+                if (distanceToCenter > maxObjectRadius + collisionRadius + 20) {
+                    continue; // Object is too far away to collide
+                }
+                
+                // Check if position (with collision radius) overlaps with bounding box
+                const expandedMinX = box.min.x - collisionRadius;
+                const expandedMaxX = box.max.x + collisionRadius;
+                const expandedMinZ = box.min.z - collisionRadius;
+                const expandedMaxZ = box.max.z + collisionRadius;
+                
+                if (x >= expandedMinX && x <= expandedMaxX &&
+                    z >= expandedMinZ && z <= expandedMaxZ) {
+                    return true; // Collision detected
+                }
+            } catch (error) {
+                // Skip this object if error
+                continue;
+            }
+        }
+        
+        return false; // No collision
+    } catch (error) {
+        // If any error occurs, allow movement (return false = no collision)
+        console.error('Collision detection error:', error);
+        return false;
+    }
+}
+
 export function moveElf(){
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
@@ -480,8 +583,12 @@ export function moveElf(){
         elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
         return;
     }
-    
+
     const moveSpeed = 0.3;
+    
+    // Store current position
+    const currentX = elfGroup.position.x;
+    const currentZ = elfGroup.position.z;
     
     // Use elfGroup's rotation for movement direction
     const elfRotation = elfGroup.rotation.y;
@@ -498,18 +605,37 @@ export function moveElf(){
         Math.cos(elfRotation + Math.PI / 2)
     );
     
+    // Calculate new position
+    let newX = currentX;
+    let newZ = currentZ;
+    
     if (keysPressed['arrowup']) {
-        elfGroup.position.x += forward.x * moveSpeed;
-        elfGroup.position.z += forward.z * moveSpeed;
+        newX = currentX + forward.x * moveSpeed;
+        newZ = currentZ + forward.z * moveSpeed;
     } else if (keysPressed['arrowdown']) {
-        elfGroup.position.x -= forward.x * moveSpeed;
-        elfGroup.position.z -= forward.z * moveSpeed;
+        newX = currentX - forward.x * moveSpeed;
+        newZ = currentZ - forward.z * moveSpeed;
     } else if (keysPressed['arrowleft']) {
-        elfGroup.position.x += right.x * moveSpeed;
-        elfGroup.position.z += right.z * moveSpeed;
+        newX = currentX + right.x * moveSpeed;
+        newZ = currentZ + right.z * moveSpeed;
     } else if (keysPressed['arrowright']) {
-        elfGroup.position.x -= right.x * moveSpeed;
-        elfGroup.position.z -= right.z * moveSpeed;
+        newX = currentX - right.x * moveSpeed;
+        newZ = currentZ - right.z * moveSpeed;
+    }
+    
+    // Check for collision before moving
+    try {
+        if (!checkElfCollision(newX, newZ)) {
+            // No collision - apply movement
+            elfGroup.position.x = newX;
+            elfGroup.position.z = newZ;
+        }
+        // If collision detected, don't move (elf stays in current position)
+    } catch (error) {
+        // If collision check fails, allow movement anyway
+        console.error('Collision check error in moveElf:', error);
+        elfGroup.position.x = newX;
+        elfGroup.position.z = newZ;
     }
     
     elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
@@ -583,9 +709,9 @@ function getHeightFromMesh(mesh, x, z) {
     const origin = new THREE.Vector3(x, 1000, z);
     const direction = new THREE.Vector3(0, -1, 0);
     raycaster.set(origin, direction);
-    
+
     const intersects = raycaster.intersectObject(mesh, false);
-    
+
     if (intersects.length > 0) {
         return intersects[0].point.y;
     }
@@ -671,7 +797,7 @@ function initKeyboardListeners() {
     window.addEventListener('keydown', (e) => {
         const key = normalizeKey(e.key);
         if (isTrackedKey(key)) {
-            keysPressed[key] = true;
+                keysPressed[key] = true;
             e.preventDefault();
         }
     });
@@ -679,7 +805,7 @@ function initKeyboardListeners() {
     window.addEventListener('keyup', (e) => {
         const key = normalizeKey(e.key);
         if (isTrackedKey(key)) {
-            keysPressed[key] = false;
+                keysPressed[key] = false;
             e.preventDefault();
         }
     });
@@ -824,16 +950,16 @@ function getCottageGroup(){
  * @param {number} yOffset - Offset to add to baseY (default: 0.6)
  */
 function addEdgeLights(start, end, axis, fixed1, fixed2, baseY, spacing, points, yOffset = 0.6) {
-    for (let v = start; v <= end; v += spacing) {
-        let point;
-        if (axis === 'x') {
+        for (let v = start; v <= end; v += spacing) {
+            let point;
+            if (axis === 'x') {
             point = new THREE.Vector3(v, baseY + yOffset, fixed2);
-        } else if (axis === 'z') {
+            } else if (axis === 'z') {
             point = new THREE.Vector3(fixed1, baseY + yOffset, v);
+            }
+            points.push(point);
         }
-        points.push(point);
     }
-}
 
 /**
  * Helper function to add lights along a diagonal line between two 3D points
@@ -1095,7 +1221,7 @@ function addChristmasLightsToCottage(){
     const box = new THREE.Box3().setFromObject(cottage);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-        
+    
     const points = addLightsToFence(size, center);
     const topPoints = addLightsToTopFence(size, center);
     const roofPoints = addLightsToRoofEdges(size, center);
@@ -1119,7 +1245,7 @@ function addChristmasLightsToCottage(){
     if (cottageGroup) {
         cottageGroup.add(christmasLights);
     } else {
-        scene.add(christmasLights);
+    scene.add(christmasLights);
     }
 }
 
@@ -1735,6 +1861,7 @@ function createSnowmanButtons(){
  */
 function createSnowman(x, z) {
     snowmanGroup = new THREE.Group();
+    snowmanGroup.name = 'snowmanGroup'; // Add name for collision detection
     snowmanGroup.add(createSnowmanBottom());
     snowmanGroup.add(createSnowmanMiddle());
     snowmanGroup.add(createSnowmanTop());
@@ -2044,6 +2171,7 @@ function createTreeLights(){
  */
 async function createTree(x, z){
     const treeGroup = new THREE.Group();
+    treeGroup.name = 'treeGroup'; // Add name for collision detection
     treeGroup.add(createTreeTrunk());
     treeGroup.add(createTreeBottom());
     treeGroup.add(createTreeMiddle());
@@ -2210,6 +2338,15 @@ async function generateSnowmen(){
         sceneObjects
     );
     
+    // Find all snowman groups in the scene and add them to sceneObjects
+    scene.traverse((child) => {
+        if (child instanceof THREE.Group && child.name === 'snowmanGroup') {
+            if (!sceneObjects.includes(child)) {
+                sceneObjects.push(child);
+            }
+        }
+    });
+    
     for (const pos of placedSnowmen) {
         sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: SNOWMAN_SPACING });
     }
@@ -2239,6 +2376,15 @@ async function generateTrees(){
         createTree,
         sceneObjects
     );
+    
+    // Find all tree groups in the scene and add them to sceneObjects
+    scene.traverse((child) => {
+        if (child instanceof THREE.Group && child.name === 'treeGroup') {
+            if (!sceneObjects.includes(child)) {
+                sceneObjects.push(child);
+            }
+        }
+    });
     
     for (const pos of placedTrees) {
         sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: TREE_SPACING });
