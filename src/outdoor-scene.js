@@ -359,7 +359,7 @@ function generateCloudPosition() {
             Math.random() * 100 - 50   // z: -50 to 50
         );
 
-        var tooClose = generateCloudPosition.pastPositions.some(pos => 
+        let tooClose = generateCloudPosition.pastPositions.some(pos => 
             pos.distanceTo(cloudPosition) < 5
         );
         attempt++;
