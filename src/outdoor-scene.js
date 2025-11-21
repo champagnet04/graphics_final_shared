@@ -15,6 +15,15 @@ let ground = null;
 let pond = null;
 let elf = null;
 let elfGroup = new THREE.Group();
+
+const direction = new THREE.Vector3(); // For translation (Arrow Keys)
+const rotationKeys = { left: false, right: false }; // For A/D rotation input
+const pitchKeys = { up: false, down: false };
+let elfRotationAngle = 0; // The total angle the elf has turned
+const rotationSpeed = 1.5; // Elf turning speed (in radians per second)
+const pitchSpeed = 0.8; // <-- NEW: Camera pitch speed
+const movementSpeed = 6; // Elf walking speed
+
 export let northernLights = null;
 let snowmanGroup = null;
 let campfireGroup = null;
@@ -151,42 +160,34 @@ function setupCamera() {
  * 
  * No parameters. Camera is updated in-place (side effect function).
  */
-export function followElf() { 
-    if (!elf) {
-        elf = scene.children.find(child => child.name === 'elf');
-    }
-    
-    if (!elf) {
+export function followElf(delta) { 
+    if (!elf || !elfGroup || !camera) {
         return;
     }
-    
-    if (!elfGroup || elfGroup.children.length === 0) {
-        elfGroup = elf.parent;
-    }
-    if (!elfGroup) {
-        return;
-    }
-    
+
+    const angle = elfGroup.rotation.y;
     const cameraDistance = 8;
     const cameraHeight = 5;
-    
-    const facingAngle = elfGroup.rotation.y;
-    
-    const cameraX = elfGroup.position.x - Math.sin(facingAngle) * cameraDistance;
-    const cameraZ = elfGroup.position.z - Math.cos(facingAngle) * cameraDistance;
-    const cameraY = elfGroup.position.y + cameraHeight;
-    
-    camera.position.set(cameraX, cameraY, cameraZ);
-    
-    const lookAheadDistance = 3;
-    const lookX = elfGroup.position.x + Math.sin(facingAngle) * lookAheadDistance;
-    const lookZ = elfGroup.position.z + Math.cos(facingAngle) * lookAheadDistance;
-    const baseLookY = elfGroup.position.y + 1;
-    
-    const pitchOffset = Math.sin(cameraPitch) * 5;
-    const lookY = baseLookY + pitchOffset;
-    
-    camera.lookAt(lookX, lookY, lookZ);
+
+    // 1. Calculate the fixed camera position (BEHIND the elf)
+    const targetPos = new THREE.Vector3(
+        elfGroup.position.x - Math.sin(angle) * cameraDistance, 
+        elfGroup.position.y + cameraHeight,
+        elfGroup.position.z - Math.cos(angle) * cameraDistance
+    );
+
+    // 2. Set the camera's fixed position (Keeps camera stuck to the back)
+    camera.position.copy(targetPos);
+
+    // 3. Set camera look-at point, incorporating cameraPitch
+    // The look-at point shifts vertically based on the cameraPitch variable.
+    const lookAhead = new THREE.Vector3(
+        elfGroup.position.x, // Look at the elf's X position
+        elfGroup.position.y + 1 + Math.tan(cameraPitch) * 5, // <--- Camera Pitch (W/S) applied here
+        elfGroup.position.z  // Look at the elf's Z position
+    );
+
+    camera.lookAt(lookAhead);
 }
 
 /**
@@ -598,79 +599,27 @@ function checkElfCollision(x, z) {
  * @export
  * @function moveElf
  */
-export function moveElf() {
-    if (!elf) {
-        elf = scene.children.find(child => child.name === 'elf');
+export function moveElf(delta) {
+    if (!elfGroup) {
+        return;
     }
-    if (!elf) return;
     
-    if (!elfGroup || elfGroup.children.length === 0) {
-        elfGroup = elf.parent;
-    }
-    if (!elfGroup) return;
-    
-    if (!keysPressed['arrowup'] && !keysPressed['arrowdown'] && 
-        !keysPressed['arrowleft'] && !keysPressed['arrowright']) {
+    if (direction.lengthSq() === 0) {
+        // If no translation input, just update height and return
         elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
         return;
     }
 
-    const moveSpeed = 0.3;
+    // 1. Normalize and scale the movement vector
+    const moveVector = direction.clone().normalize().multiplyScalar(movementSpeed * delta);
     
-    const currentX = elfGroup.position.x;
-    const currentZ = elfGroup.position.z;
+    // 2. Apply the movement relative to the elf's current orientation
+    // translateX: Strafe Left/Right (ArrowLeft/ArrowRight)
+    // translateZ: Forward/Backward (ArrowUp/ArrowDown)
+    elfGroup.translateX(moveVector.x); 
+    elfGroup.translateZ(moveVector.z); 
     
-    const elfRotation = elfGroup.rotation.y;
-    
-    const forward = new THREE.Vector3(
-        Math.sin(elfRotation),
-        0,
-        Math.cos(elfRotation)
-    );
-    
-    const right = new THREE.Vector3(
-        Math.sin(elfRotation + Math.PI / 2),
-        0,
-        Math.cos(elfRotation + Math.PI / 2)
-    );
-    
-    let newX = currentX;
-    let newZ = currentZ;
-    
-    if (keysPressed['arrowup']) {
-        newX = currentX + forward.x * moveSpeed;
-        newZ = currentZ + forward.z * moveSpeed;
-    } else if (keysPressed['arrowdown']) {
-        newX = currentX - forward.x * moveSpeed;
-        newZ = currentZ - forward.z * moveSpeed;
-    } else if (keysPressed['arrowleft']) {
-        newX = currentX + right.x * moveSpeed;
-        newZ = currentZ + right.z * moveSpeed;
-    } else if (keysPressed['arrowright']) {
-        newX = currentX - right.x * moveSpeed;
-        newZ = currentZ - right.z * moveSpeed;
-    }
-    
-    try {
-        // First check if the new position is within ground bounds
-        if (!checkGroundBounds(newX, newZ)) {
-            return; // Don't move if outside ground bounds
-        }
-        
-        // Then check for collisions with scene objects
-        if (!checkElfCollision(newX, newZ)) {
-            elfGroup.position.x = newX;
-            elfGroup.position.z = newZ;
-        }
-    } catch (error) {
-        console.error('Collision check error in moveElf:', error);
-        // Only update position if within bounds even on error
-        if (checkGroundBounds(newX, newZ)) {
-            elfGroup.position.x = newX;
-            elfGroup.position.z = newZ;
-        }
-    }
-    
+    // 3. Update height
     elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
 }
 
@@ -696,30 +645,32 @@ export function moveElf() {
  * @export
  * @function lookAround
  */
-export function lookAround() {
-    if (!elf) {
-        elf = scene.children.find(child => child.name === 'elf');
-    }
-    
-    if (!elf) {
-        return;
-    }
+// outdoor-scene.js
 
-    const turnSpeed = 0.05;
-    if (keysPressed['a']) {
-        elfGroup.rotation.y += turnSpeed;
+// outdoor-scene.js
+
+export function lookAround(delta) {
+    if (!elfGroup) return;
+
+    // 1. A/D: Update Elf Rotation
+    if (rotationKeys.left) {
+        elfRotationAngle += rotationSpeed * delta;
     }
-    if (keysPressed['d']) {
-        elfGroup.rotation.y -= turnSpeed;
+    if (rotationKeys.right) {
+        elfRotationAngle -= rotationSpeed * delta;
     }
+    elfGroup.rotation.y = elfRotationAngle;
     
-    const lookSpeed = 0.02;
-    const maxPitch = Math.PI / 3;
-    if (keysPressed['w']) {
-        cameraPitch = Math.min(cameraPitch + lookSpeed, maxPitch);
+    // 2. W/S: Update Camera Pitch (Look Up/Down)
+    const pitchChange = pitchSpeed * delta;
+    const maxPitchUp = Math.PI * 0.4;   // ~72 degrees up
+    const maxPitchDown = -Math.PI * 0.1; // ~-18 degrees down (looking slightly down)
+    
+    if (pitchKeys.up) {
+        cameraPitch = Math.min(maxPitchUp, cameraPitch + pitchChange);
     }
-    if (keysPressed['s']) {
-        cameraPitch = Math.max(cameraPitch - lookSpeed, -maxPitch);
+    if (pitchKeys.down) {
+        cameraPitch = Math.max(maxPitchDown, cameraPitch - pitchChange);
     }
 }
 
@@ -827,20 +778,40 @@ function isTrackedKey(key) {
  * or other side effects.
  */
 function initKeyboardListeners() {
-    window.addEventListener('keydown', (e) => {
-        const key = normalizeKey(e.key);
-        if (isTrackedKey(key)) {
-                keysPressed[key] = true;
-            e.preventDefault();
-        }
+    document.addEventListener('keydown', (event) => {
+        const key = event.code;
+        
+        // Arrow Keys for Movement (Translation) - STAYS THE SAME
+        if (key === 'ArrowUp') direction.z = 1;
+        if (key === 'ArrowDown') direction.z = -1;
+        if (key === 'ArrowLeft') direction.x = 1;
+        if (key === 'ArrowRight') direction.x = -1;
+        
+        // A/D Keys for Elf Rotation
+        if (key === 'KeyA') rotationKeys.left = true;
+        if (key === 'KeyD') rotationKeys.right = true;
+
+        // W/S Keys for Camera Pitch (Look Up/Down)
+        if (key === 'KeyW') pitchKeys.up = true;
+        if (key === 'KeyS') pitchKeys.down = true;
     });
-    
-    window.addEventListener('keyup', (e) => {
-        const key = normalizeKey(e.key);
-        if (isTrackedKey(key)) {
-                keysPressed[key] = false;
-            e.preventDefault();
-        }
+
+    document.addEventListener('keyup', (event) => {
+        const key = event.code;
+        
+        // Arrow Keys for Movement (Translation) - STAYS THE SAME
+        if (key === 'ArrowUp' && direction.z === 1) direction.z = 0;
+        if (key === 'ArrowDown' && direction.z === -1) direction.z = 0;
+        if (key === 'ArrowLeft' && direction.x === 1) direction.x = 0;
+        if (key === 'ArrowRight' && direction.x === -1) direction.x = 0;
+
+        // A/D Keys for Elf Rotation
+        if (key === 'KeyA') rotationKeys.left = false;
+        if (key === 'KeyD') rotationKeys.right = false;
+
+        // W/S Keys for Camera Pitch (Look Up/Down)
+        if (key === 'KeyW') pitchKeys.up = false;
+        if (key === 'KeyS') pitchKeys.down = false;
     });
 }
 
@@ -3448,7 +3419,7 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
     return null;
 }
 
-function morphSnowballIntoSplat(){
+function morphSnowballIntoSplat() {
     if (!snowballThrowAnimation) {
         return;
     }
@@ -3812,7 +3783,6 @@ function startAllSceneSounds() {
  * This should be the function called by the 'click' and 'keydown' event listeners.
  */
 export function startAudio() { 
-    // 1. INITIALIZE LISTENER: Create listener and attach to camera (tracks player position).
     if (!audioListener) { 
         audioListener = new THREE.AudioListener(); 
         camera.add(audioListener); 

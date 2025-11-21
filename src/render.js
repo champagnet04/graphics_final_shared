@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { setupOutdoorScene } from './outdoor-scene.js';
-import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity, makeSnowmanSpeak, pickUpSnowball, updateSnowballThrow, throwSnowball, hasSnowballInHand } from './outdoor-scene.js';
+import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity, makeSnowmanSpeak, pickUpSnowball, updateSnowballThrow, throwSnowball, hasSnowballInHand, startAudio } from './outdoor-scene.js';
 
 // Initialize the scene asynchronously
 async function init() {
     const { scene, camera } = await setupOutdoorScene();
+
+    const clock = new THREE.Clock();
 
     // Update camera aspect ratio to match window
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -87,23 +89,28 @@ async function init() {
     
     renderer.domElement.addEventListener('click', onMouseClick);
 
-    // Update camera aspect ratio when window resizes
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
+
+    document.addEventListener('click', startAudio);
+    document.addEventListener('keydown', startAudio);
     
     function animate() {
         requestAnimationFrame(animate);
-        lookAround();
-        moveElf();
-        followElf();
+        const delta = clock.getDelta();
+
+        lookAround(delta);
+        moveElf(delta);
+        followElf(delta);
+
         checkCampfireProximity();
         updateSnow();
         updateSnowballThrow();
         if (northernLights) {
-            northernLights.material.uniforms.time.value += 0.01;
+            northernLights.material.uniforms.time.value += delta * 1.0;
         }
         renderer.render(scene, camera);
     }
