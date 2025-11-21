@@ -401,26 +401,6 @@ async function createCloud(){
     }
 }
 
-
-/**
- * Asynchronously generates and adds multiple cloud objects to the scene.
- *
- * This function creates 50 clouds by calling the createCloud() function for each,
- * ensuring all clouds are created and added asynchronously. Uses Promise.all to
- * await completion of all cloud creation tasks before resolving.
- *
- * @async
- * @function
- * @returns {Promise<void>} Resolves when all cloud objects have been created and added to the scene.
- */
-async function generateClouds() {
-    const clouds = [];
-    for (let i = 0; i < 50; i++) {
-        clouds.push(createCloud());
-    }
-    await Promise.all(clouds);
-}
-
 /**
  * Asynchronously loads the Christmas elf 3D model and adds it to the scene at the origin.
  *
@@ -443,7 +423,18 @@ async function generateElfAtOrigin(){
         elf.position.set(0, 0, 0);
         elf.scale.setScalar(0.04);
         
+        elf.castShadow = true;
+        elf.receiveShadow = true;
+        elf.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        
         elfGroup.add(elf);
+        elfGroup.castShadow = true;
+        elfGroup.receiveShadow = true;
         scene.add(elfGroup);
         
         return elf;
