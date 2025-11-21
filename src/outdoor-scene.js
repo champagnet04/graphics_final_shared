@@ -14,6 +14,7 @@ let cameraPitch = 0;
 let ground = null;
 let pond = null;
 let elf = null;
+let elfGroup = new THREE.Group();
 export let northernLights = null;
 let snowmanGroup = null;
 let campfireGroup = null;
@@ -32,10 +33,19 @@ const treeMaterial = new THREE.MeshStandardMaterial({
     side: THREE.DoubleSide
 });
 
+const wallMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    side: THREE.DoubleSide,
+    map: loadWallTexture(),
+    transparent: true,
+    opacity: 0.7
+});
+
 let sceneObjects = [];
 let audioListener = null;
 let fireCrackleSound = null;
 const keysPressed = {};
+let snowballThrowAnimation = null; // { snowball, path, impactT, currentT, speed }
 
 const groundBounds = {
     xMin: -100,
@@ -150,21 +160,28 @@ export function followElf() {
         return;
     }
     
+    if (!elfGroup || elfGroup.children.length === 0) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) {
+        return;
+    }
+    
     const cameraDistance = 8;
     const cameraHeight = 5;
     
-    const facingAngle = elf.rotation.y;
+    const facingAngle = elfGroup.rotation.y;
     
-    const cameraX = elf.position.x - Math.sin(facingAngle) * cameraDistance;
-    const cameraZ = elf.position.z - Math.cos(facingAngle) * cameraDistance;
-    const cameraY = elf.position.y + cameraHeight;
+    const cameraX = elfGroup.position.x - Math.sin(facingAngle) * cameraDistance;
+    const cameraZ = elfGroup.position.z - Math.cos(facingAngle) * cameraDistance;
+    const cameraY = elfGroup.position.y + cameraHeight;
     
     camera.position.set(cameraX, cameraY, cameraZ);
     
     const lookAheadDistance = 3;
-    const lookX = elf.position.x + Math.sin(facingAngle) * lookAheadDistance;
-    const lookZ = elf.position.z + Math.cos(facingAngle) * lookAheadDistance;
-    const baseLookY = elf.position.y + 1;
+    const lookX = elfGroup.position.x + Math.sin(facingAngle) * lookAheadDistance;
+    const lookZ = elfGroup.position.z + Math.cos(facingAngle) * lookAheadDistance;
+    const baseLookY = elfGroup.position.y + 1;
     
     const pitchOffset = Math.sin(cameraPitch) * 5;
     const lookY = baseLookY + pitchOffset;
@@ -272,10 +289,12 @@ function createGround() {
     modifyTerrainHeights(groundGeometry);
 
     ground = new THREE.Mesh(groundGeometry, snowMaterial);
+    ground.name = 'ground'; // Add name for identification
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
     ground.castShadow = true;
     ground.receiveShadow = true;
+    ground.visible = true; // Ensure it's visible
     scene.add(ground);
 }
 
@@ -340,14 +359,14 @@ function generateCloudPosition() {
             Math.random() * 100 - 50   // z: -50 to 50
         );
 
-        var tooClose = generateCloudPosition.pastPositions.some(pos =>
+        var tooClose = generateCloudPosition.pastPositions.some(pos => 
             pos.distanceTo(cloudPosition) < 5
         );
         attempt++;
     } while (tooClose && attempt < 100);
 
     generateCloudPosition.pastPositions.push(cloudPosition);
-
+    
     return cloudPosition;
 }
 
@@ -389,26 +408,6 @@ async function createCloud() {
     }
 }
 
-
-/**
- * Asynchronously generates and adds multiple cloud objects to the scene.
- *
- * This function creates 50 clouds by calling the createCloud() function for each,
- * ensuring all clouds are created and added asynchronously. Uses Promise.all to
- * await completion of all cloud creation tasks before resolving.
- *
- * @async
- * @function
- * @returns {Promise<void>} Resolves when all cloud objects have been created and added to the scene.
- */
-async function generateClouds() {
-    const clouds = [];
-    for (let i = 0; i < 50; i++) {
-        clouds.push(createCloud());
-    }
-    await Promise.all(clouds);
-}
-
 /**
  * Asynchronously loads the Christmas elf 3D model and adds it to the scene at the origin.
  *
@@ -431,7 +430,20 @@ async function generateElfAtOrigin() {
         elf.position.set(0, 0, 0);
         elf.scale.setScalar(0.04);
         
-        scene.add(elf);
+        elf.castShadow = true;
+        elf.receiveShadow = true;
+        elf.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        
+        elfGroup.add(elf);
+        elfGroup.castShadow = true;
+        elfGroup.receiveShadow = true;
+        scene.add(elfGroup);
+        
         return elf;
     } catch (error) {
         console.error('Cant load model:', error);
@@ -457,21 +469,158 @@ async function generateElfAtOrigin() {
  * @export
  * @function moveElf
  */
+/**
+ * Checks if a position (x, z) is within the ground bounds.
+ * Accounts for the elf's collision radius to prevent going partially off the edge.
+ * 
+ * @param {number} x - The X coordinate to check
+ * @param {number} z - The Z coordinate to check
+ * @returns {boolean} True if the position is within bounds, false otherwise
+ */
+function checkGroundBounds(x, z) {
+    const collisionRadius = 0.5;
+    
+    // Check if position (accounting for collision radius) is within ground bounds
+    if (x - collisionRadius < groundBounds.xMin || x + collisionRadius > groundBounds.xMax) {
+        return false;
+    }
+    if (z - collisionRadius < groundBounds.zMin || z + collisionRadius > groundBounds.zMax) {
+        return false;
+    }
+    
+    return true;
+}
+
+/**
+ * Checks if a position (x, z) would collide with any scene objects.
+ * Excludes ground and pond.
+ * 
+ * @param {number} x - The X coordinate to check
+ * @param {number} z - The Z coordinate to check
+ * @returns {boolean} True if there would be a collision, false otherwise
+ */
+function checkElfCollision(x, z) {
+    try {
+        const collisionRadius = 0.5;
+        
+        const objectsToCheck = sceneObjects.filter(obj => obj instanceof THREE.Object3D);
+        
+        scene.traverse((child) => {
+            if (child instanceof THREE.Group) {
+                if (child.name === 'cottageGroup' || 
+                    child.name === 'snowmanGroup' || 
+                    (child.name && child.name.startsWith('treeGroup')) ||
+                    child.name === 'campfireGroup' ||
+                    child.name === 'logGroup') {
+                    if (!objectsToCheck.includes(child)) {
+                        objectsToCheck.push(child);
+                    }
+                }
+            }
+        });
+        
+        for (const obj of objectsToCheck) {
+            if (!obj || obj.name === 'elfGroup' || obj.name === 'snowballPile' || 
+                obj.name === 'ground' || obj === ground || obj === pond || obj === elfGroup) {
+                continue;
+            }
+            
+            if (obj.visible === false) {
+                continue;
+            }
+            
+            try {
+                const box = new THREE.Box3();
+                box.setFromObject(obj);
+                
+                if (box.isEmpty()) {
+                    continue;
+                }
+                
+                const boxSize = box.getSize(new THREE.Vector3());
+                if (boxSize.x > 100 || boxSize.z > 100 || boxSize.y > 100) {
+                    continue;
+                }
+                
+                const boxCenter = box.getCenter(new THREE.Vector3());
+                const distanceToCenter = Math.sqrt(
+                    Math.pow(x - boxCenter.x, 2) + Math.pow(z - boxCenter.z, 2)
+                );
+                const maxObjectRadius = Math.max(boxSize.x, boxSize.z) / 2;
+                if (distanceToCenter > maxObjectRadius + collisionRadius + 20) {
+                    continue;
+                }
+                
+                const expandedMinX = box.min.x - collisionRadius;
+                const expandedMaxX = box.max.x + collisionRadius;
+                const expandedMinZ = box.min.z - collisionRadius;
+                const expandedMaxZ = box.max.z + collisionRadius;
+                
+                if (x >= expandedMinX && x <= expandedMaxX &&
+                    z >= expandedMinZ && z <= expandedMaxZ) {
+                    return true;
+                }
+            } catch (error) {
+                continue;
+            }
+        }
+        
+        return false;
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
+ * Moves the elf character in the scene based on arrow key input.
+ *
+ * This function checks the keysPressed object to determine which directional
+ * keys (arrowup, arrowdown, arrowleft, arrowright) are currently pressed and
+ * adjusts the elf's position accordingly. The movement takes into account the
+ * elf's current rotation so that movement directions are relative to where the
+ * elf is facing.
+ *
+ * The function performs the following steps:
+ *   - Attempts to obtain references to the elf and elfGroup if they are not already set.
+ *   - Returns early if the elf or elfGroup is missing.
+ *   - If no movement keys are pressed, only updates the elf's vertical position
+ *     based on terrain height at the current position.
+ *   - If a movement key is pressed, computes the proposed new (x, z) position
+ *     according to the key and the elf's orientation.
+ *   - Checks for collisions at the proposed new position using checkElfCollision.
+ *   - If no collision is detected, updates the elf's position in the scene.
+ *   - Always updates the elf's y-coordinate to match the height of the terrain
+ *     at the new (x, z) position.
+ *
+ * If an error occurs during collision checking, the function logs the error
+ * and allows the move.
+ *
+ * @export
+ * @function moveElf
+ */
 export function moveElf() {
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
     }
     if (!elf) return;
     
+    if (!elfGroup || elfGroup.children.length === 0) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) return;
+    
     if (!keysPressed['arrowup'] && !keysPressed['arrowdown'] && 
         !keysPressed['arrowleft'] && !keysPressed['arrowright']) {
-        elf.position.y = getHeightAt(elf.position.x, elf.position.z);
+        elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
         return;
     }
-    
+
     const moveSpeed = 0.3;
     
-    const elfRotation = elf.rotation.y;
+    const currentX = elfGroup.position.x;
+    const currentZ = elfGroup.position.z;
+    
+    const elfRotation = elfGroup.rotation.y;
     
     const forward = new THREE.Vector3(
         Math.sin(elfRotation),
@@ -485,21 +634,44 @@ export function moveElf() {
         Math.cos(elfRotation + Math.PI / 2)
     );
     
+    let newX = currentX;
+    let newZ = currentZ;
+    
     if (keysPressed['arrowup']) {
-        elf.position.x += forward.x * moveSpeed;
-        elf.position.z += forward.z * moveSpeed;
+        newX = currentX + forward.x * moveSpeed;
+        newZ = currentZ + forward.z * moveSpeed;
     } else if (keysPressed['arrowdown']) {
-        elf.position.x -= forward.x * moveSpeed;
-        elf.position.z -= forward.z * moveSpeed;
+        newX = currentX - forward.x * moveSpeed;
+        newZ = currentZ - forward.z * moveSpeed;
     } else if (keysPressed['arrowleft']) {
-        elf.position.x += right.x * moveSpeed;
-        elf.position.z += right.z * moveSpeed;
+        newX = currentX + right.x * moveSpeed;
+        newZ = currentZ + right.z * moveSpeed;
     } else if (keysPressed['arrowright']) {
-        elf.position.x -= right.x * moveSpeed;
-        elf.position.z -= right.z * moveSpeed;
+        newX = currentX - right.x * moveSpeed;
+        newZ = currentZ - right.z * moveSpeed;
     }
     
-    elf.position.y = getHeightAt(elf.position.x, elf.position.z);
+    try {
+        // First check if the new position is within ground bounds
+        if (!checkGroundBounds(newX, newZ)) {
+            return; // Don't move if outside ground bounds
+        }
+        
+        // Then check for collisions with scene objects
+        if (!checkElfCollision(newX, newZ)) {
+            elfGroup.position.x = newX;
+            elfGroup.position.z = newZ;
+        }
+    } catch (error) {
+        console.error('Collision check error in moveElf:', error);
+        // Only update position if within bounds even on error
+        if (checkGroundBounds(newX, newZ)) {
+            elfGroup.position.x = newX;
+            elfGroup.position.z = newZ;
+        }
+    }
+    
+    elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
 }
 
 /**
@@ -535,10 +707,10 @@ export function lookAround() {
 
     const turnSpeed = 0.05;
     if (keysPressed['a']) {
-        elf.rotation.y += turnSpeed;
+        elfGroup.rotation.y += turnSpeed;
     }
     if (keysPressed['d']) {
-        elf.rotation.y -= turnSpeed;
+        elfGroup.rotation.y -= turnSpeed;
     }
     
     const lookSpeed = 0.02;
@@ -570,9 +742,9 @@ function getHeightFromMesh(mesh, x, z) {
     const origin = new THREE.Vector3(x, 1000, z);
     const direction = new THREE.Vector3(0, -1, 0);
     raycaster.set(origin, direction);
-    
+
     const intersects = raycaster.intersectObject(mesh, false);
-    
+
     if (intersects.length > 0) {
         return intersects[0].point.y;
     }
@@ -658,7 +830,7 @@ function initKeyboardListeners() {
     window.addEventListener('keydown', (e) => {
         const key = normalizeKey(e.key);
         if (isTrackedKey(key)) {
-            keysPressed[key] = true;
+                keysPressed[key] = true;
             e.preventDefault();
         }
     });
@@ -666,7 +838,7 @@ function initKeyboardListeners() {
     window.addEventListener('keyup', (e) => {
         const key = normalizeKey(e.key);
         if (isTrackedKey(key)) {
-            keysPressed[key] = false;
+                keysPressed[key] = false;
             e.preventDefault();
         }
     });
@@ -811,16 +983,16 @@ function getCottageGroup() {
  * @param {number} yOffset - Offset to add to baseY (default: 0.6)
  */
 function addEdgeLights(start, end, axis, fixed1, fixed2, baseY, spacing, points, yOffset = 0.6) {
-    for (let v = start; v <= end; v += spacing) {
-        let point;
-        if (axis === 'x') {
+        for (let v = start; v <= end; v += spacing) {
+            let point;
+            if (axis === 'x') {
             point = new THREE.Vector3(v, baseY + yOffset, fixed2);
-        } else if (axis === 'z') {
+            } else if (axis === 'z') {
             point = new THREE.Vector3(fixed1, baseY + yOffset, v);
+            }
+            points.push(point);
         }
-        points.push(point);
     }
-}
 
 /**
  * Helper function to add lights along a diagonal line between two 3D points
@@ -1082,7 +1254,7 @@ function addChristmasLightsToCottage() {
     const box = new THREE.Box3().setFromObject(cottage);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-        
+    
     const points = addLightsToFence(size, center);
     const topPoints = addLightsToTopFence(size, center);
     const roofPoints = addLightsToRoofEdges(size, center);
@@ -1106,7 +1278,7 @@ function addChristmasLightsToCottage() {
     if (cottageGroup) {
         cottageGroup.add(christmasLights);
     } else {
-        scene.add(christmasLights);
+    scene.add(christmasLights);
     }
 }
 
@@ -1722,6 +1894,7 @@ function createSnowmanButtons() {
  */
 function createSnowman(x, z) {
     snowmanGroup = new THREE.Group();
+    snowmanGroup.name = 'snowmanGroup'; // Add name for collision detection
     snowmanGroup.add(createSnowmanBottom());
     snowmanGroup.add(createSnowmanMiddle());
     snowmanGroup.add(createSnowmanTop());
@@ -2031,6 +2204,7 @@ function createTreeLights() {
  */
 async function createTree(x, z) {
     const treeGroup = new THREE.Group();
+    treeGroup.name = 'treeGroup'; // Add name for collision detection
     treeGroup.add(createTreeTrunk());
     treeGroup.add(createTreeBottom());
     treeGroup.add(createTreeMiddle());
@@ -2197,6 +2371,15 @@ async function generateSnowmen() {
         sceneObjects
     );
     
+    // Find all snowman groups in the scene and add them to sceneObjects
+    scene.traverse((child) => {
+        if (child instanceof THREE.Group && child.name === 'snowmanGroup') {
+            if (!sceneObjects.includes(child)) {
+                sceneObjects.push(child);
+            }
+        }
+    });
+    
     for (const pos of placedSnowmen) {
         sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: SNOWMAN_SPACING });
     }
@@ -2226,6 +2409,15 @@ async function generateTrees() {
         createTree,
         sceneObjects
     );
+    
+    // Find all tree groups in the scene and add them to sceneObjects
+    scene.traverse((child) => {
+        if (child instanceof THREE.Group && child.name === 'treeGroup') {
+            if (!sceneObjects.includes(child)) {
+                sceneObjects.push(child);
+            }
+        }
+    });
     
     for (const pos of placedTrees) {
         sceneObjects.push({ x: pos.x, z: pos.z, minSpacing: TREE_SPACING });
@@ -2413,7 +2605,20 @@ function addSceneMusic() {
  * @returns {void}
  */
 export function checkCampfireProximity() {
-    if (!elf || !audioListener || !fireCrackleSound) {
+    if (!elf) {
+        return;
+    }
+    
+    if (!audioListener) {
+        return;
+    }
+    
+    if (!fireCrackleSound) {
+        return;
+    }
+    
+    // Use global elfGroup directly
+    if (!elfGroup) {
         return;
     }
     
@@ -2425,16 +2630,24 @@ export function checkCampfireProximity() {
         return;
     }
     
-    const distance = elf.position.distanceTo(campfireGroup.position);
+    // Use elfGroup position for distance calculation (elf is inside elfGroup)
+    const distance = elfGroup.position.distanceTo(campfireGroup.position);
     const proximityRadius = 30;
     
     if (distance <= proximityRadius) {
         resumeAudioContext();
-        if (!fireCrackleSound.isPlaying) {
-            fireCrackleSound.play();
+        // Check if the sound buffer is loaded before trying to play
+        if (fireCrackleSound.buffer) {
+            if (!fireCrackleSound.isPlaying) {
+                try {
+                    fireCrackleSound.play();
+                } catch (err) {
+                    console.error('Error playing fire crackle sound:', err);
+                }
+            }
         }
     } else {
-        if (fireCrackleSound.isPlaying) {
+        if (fireCrackleSound.buffer && fireCrackleSound.isPlaying) {
             fireCrackleSound.pause();
         }
     }
@@ -2728,8 +2941,49 @@ export function makeSnowmanSpeak() {
     speechSynthesis.speak(speech);
 }
 
-function createSnowball() {
-    const snowball = new THREE.Mesh(ballGeometry, snowMaterial);
+/**
+ * Creates a snowball mesh with morph target for squash/stretch animation.
+ *
+ * This function constructs a sphere geometry to represent a snowball and adds
+ * a morph target that flattens and stretches the sphere. The morph target can be used
+ * for animation effects such as squashing upon impact or interaction.
+ *
+ * The snowball's geometry:
+ * - Base geometry: sphere of radius 0.3 and 16 width/height segments.
+ * - Morph target: stretches X and Z (by flatteningFactor), flattens Y (by 0.1).
+ *
+ * Returns a THREE.Mesh object using the snowMaterial (cloned).
+ *
+ * @returns {THREE.Mesh} The snowball mesh with morph target.
+ */
+function createSnowball(){
+    const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+    
+    const positionAttribute = geometry.attributes.position;
+    const morphPositions = [];
+    
+    for (let i = 0; i < positionAttribute.count; i++) {
+        const x = positionAttribute.getX(i);
+        const y = positionAttribute.getY(i);
+        const z = positionAttribute.getZ(i);
+        
+        const flatteningFactor = 3;
+        const newY = y * 0.1;
+        const newX = x * flatteningFactor;
+        const newZ = z * flatteningFactor;
+        
+        morphPositions.push(newX, newY, newZ);
+    }
+    
+    geometry.morphAttributes.position = [
+        new THREE.Float32BufferAttribute(morphPositions, 3)
+    ];
+    
+    const snowballMaterial = snowMaterial.clone();
+    const snowball = new THREE.Mesh(geometry, snowballMaterial);
+    
+    snowball.morphTargetInfluences = [0];
+    
     return snowball;
 }
 
@@ -2771,47 +3025,733 @@ function createSnowballPile() {
     scene.add(snowballPile);
 }
 
-export function pickUpSnowball() {
-    console.log('pickUpSnowball');
-    //when you click the snowballPile, a snowball generates in you hand
+/**
+ * Checks if the elf currently has a snowball in hand.
+ * 
+ * @returns {boolean} True if a snowball is found in hand, false otherwise.
+ */
+export function hasSnowballInHand(){
+    // Ensure elf and elfGroup are available
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
+        if (!elf) {
+            scene.traverse((child) => {
+                if (child.name === 'elf') {
+                    elf = child;
+                }
+            });
+        }
+    }
+    if (!elf) {
+        return false;
     }
     
+    // Get the elfGroup (parent of elf, or use global if available)
+    if (!elfGroup) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) {
+        return false;
+    }
+    
+    // Check in elfGroup first (where it should be when held)
+    const snowball = elfGroup.children.find(child => child.name === 'snowballInHand');
+    if (snowball) {
+        return true;
+    }
+    
+    // Also check if there's a snowball in the scene (from a previous incomplete throw)
+    let foundInScene = false;
+    scene.traverse((child) => {
+        if (child.name === 'snowballInHand' && child.parent === scene) {
+            foundInScene = true;
+        }
+    });
+    
+    return foundInScene;
+}
+
+/**
+ * Adds a snowball mesh to the elf character's hand (held position).
+ *
+ * This function ensures the elf character (as represented by elfGroup) is valid.
+ * If a snowball is already present in the elf's hand, it will be removed first,
+ * then a new snowball mesh is created, named 'snowballInHand', and added as a child
+ * of elfGroup. The function also sets up shadow casting/receiving properties for realism.
+ * The snowball's position is set relative to elfGroup to approximate a hand-held location.
+ *
+ * If elfGroup is not found, the function logs a warning and returns null.
+ * Otherwise, the function returns nothing.
+ *
+ * Typical usage: call this function to make the elf "pick up" a new snowball,
+ * either on interaction or before a snowball throw action.
+ *
+ * @export
+ * @function pickUpSnowball
+ */
+export function pickUpSnowball(){
+    // Ensure elf is available
     if (!elf) {
+        elf = scene.children.find(child => child.name === 'elf');
+        if (!elf) {
+            scene.traverse((child) => {
+                if (child.name === 'elf') {
+                    elf = child;
+                }
+            });
+        }
+    }
+    if (!elf) {
+        console.warn('Elf not found, cannot pick up snowball');
         return null;
     }
     
+    // Get the elfGroup (parent of elf, or use global if available)
+    if (!elfGroup) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) {
+        console.warn('ElfGroup not found, cannot pick up snowball');
+        return null;
+    }
+    
+    const existingSnowball = elfGroup.children.find(child => child.name === 'snowballInHand');
+    if (existingSnowball) {
+        elfGroup.remove(existingSnowball);
+    }
+    
     const snowball = createSnowball();
+    snowball.name = 'snowballInHand';
+    snowball.castShadow = true;
+    snowball.receiveShadow = true;
     
-    // Position relative to elf group (local coordinates)
-    // Since the snowball is a child of the elf, it will move and rotate with the elf
-    const handOffset = 0.8; // Height offset for hand position (local Y)
-    const forwardOffset = 0.5; // Distance in front of elf (local Z)
-    const sideOffset = 3; // Slight offset to the right (local X)
+    snowball.position.set(-2, 1.5, 1.0);
     
-    // Set position in elf's local coordinate system
-    // X = right, Y = up, Z = forward
-    snowball.position.set(3, 0.8, 0.5);
-    
-    // Add snowball to elf group (not scene) so it moves with the elf
-    elf.add(snowball);
-    
-    return snowball;
+    elfGroup.add(snowball);    
 }
 
-function throwSnowball() {
-    //when you click on any object/location, the snowball is thrown along that line (maybe with some physics so it fall towards the ground)
-    //when the snowball hits the ground it morphs into a splat shape & make a sound effect
+function createThrowPath(mouseX, mouseY){
+    if (!elfGroup) {
+        if (!elf) {
+            elf = scene.children.find(child => child.name === 'elf');
+            if (!elf) {
+                scene.traverse((child) => {
+                    if (child.name === 'elf') {
+                        elf = child;
+                    }
+                });
+            }
+        }
+        if (elf) {
+            elfGroup = elf.parent;
+        }
+    }
+    if (!elfGroup) {
+        console.warn('ElfGroup not found, cannot create throw path');
+        return null;
+    }
+    
+    let snowball = elfGroup.children.find(child => child.name === 'snowballInHand');
+    
+    if (!snowball) {
+        scene.traverse((child) => {
+            if (child.name === 'snowballInHand' && child.parent === scene) {
+                snowball = child;
+            }
+        });
+    }
+    
+    if (!snowball) {
+        console.warn('Snowball not found, cannot create throw path');
+        return null;
+    }
+    
+    const snowballWorldPos = new THREE.Vector3();
+    snowball.getWorldPosition(snowballWorldPos);
+    
+    const mouse = new THREE.Vector2();
+    mouse.x = (mouseX / window.innerWidth) * 2 - 1;
+    mouse.y = -(mouseY / window.innerHeight) * 2 + 1;
+    
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    
+    const objectsToCheck = sceneObjects.filter(obj => obj instanceof THREE.Object3D);
+    let intersects = [];
+    
+    for (const obj of objectsToCheck) {
+        try {
+            const objIntersects = raycaster.intersectObject(obj, true);
+            intersects.push(...objIntersects);
+        } catch (e) {
+            continue;
+        }
+    }
+    
+    if (ground) {
+        try {
+            const groundIntersects = raycaster.intersectObject(ground, false);
+            intersects.push(...groundIntersects);
+        } catch (e) {
+        }
+    }
+    
+    let targetPos;
+    if (intersects.length > 0) {
+        intersects.sort((a, b) => a.distance - b.distance);
+        targetPos = intersects[0].point;
+    } else {
+        const farPoint = new THREE.Vector3();
+        raycaster.ray.at(100, farPoint);
+        targetPos = farPoint;
+    }
+    
+    const path = new THREE.LineCurve3(snowballWorldPos, targetPos);
+    return path;
 }
 
-function morphSnowballIntoSplat() {
 
+/**
+ * Initiates the throwing of the snowball by the elf character.
+ *
+ * This function checks if the elf and a snowball in hand are available. If so,
+ * it creates a throw animation path towards the screen position specified
+ * by the mouse or touch coordinates (x, y). It then detaches the snowball from
+ * the elf and starts the animation that visually moves the snowball along the path.
+ *
+ * Typical usage: Call this function in response to a mouse click or tap event
+ * to throw a snowball from the elf's hand towards the user's target.
+ *
+ * @export
+ * @function
+ * @param {number} x - The X coordinate (in pixels) of the user's intended target on the screen.
+ * @param {number} y - The Y coordinate (in pixels) of the user's intended target on the screen.
+ */
+export function throwSnowball(x, y){
+    if (snowballThrowAnimation) {
+        return;
+    }
+    
+    if (!elf) {
+        elf = scene.children.find(child => child.name === 'elf');
+        if (!elf) {
+            scene.traverse((child) => {
+                if (child.name === 'elf') {
+                    elf = child;
+                }
+            });
+        }
+    }
+    if (!elf) {
+        return;
+    }
+    
+    if (!elfGroup) {
+        elfGroup = elf.parent;
+    }
+    if (!elfGroup) {
+        return;
+    }
+    
+    let snowball = elfGroup.children.find(child => child.name === 'snowballInHand');
+    
+    if (!snowball) {
+        scene.traverse((child) => {
+            if (child.name === 'snowballInHand' && child.parent === scene) {
+                snowball = child;
+            }
+        });
+    }
+    
+    if (!snowball) {
+        console.warn('No snowball in hand to throw');
+        return;
+    }
+    
+    const path = createThrowPath(x, y);
+    if (!path) {
+        return;
+    }
+    
+    const startPos = new THREE.Vector3();
+    snowball.getWorldPosition(startPos);
+    
+    const originalParent = snowball.parent;
+    
+    if (snowball.parent) {
+        snowball.parent.remove(snowball);
+    }
+    scene.add(snowball);
+    snowball.position.copy(startPos);
+    
+    snowballThrowAnimation = {
+        snowball: snowball,
+        path: path,
+        currentT: 0,
+        speed: 0.02,
+        originalParent: originalParent,
+        morphTriggered: false
+    };
 }
 
+/**
+ * Updates the snowball throw animation, moving the snowball along the path.
+ * 
+ * This function should be called every frame in the animate loop. It moves the snowball
+ * along the throw path until it reaches the impact point, then calls morphSnowballIntoSplat()
+ * and makeSplatSound().
+ * 
+ * @export
+ * @function updateSnowballThrow
+ */
+export function updateSnowballThrow(){
+    if (!snowballThrowAnimation) {
+        return;
+    }
+    
+    const { snowball, path, speed } = snowballThrowAnimation;
+    
+    if (snowballThrowAnimation.morphTriggered) {
+        return;
+    }
+    
+    snowballThrowAnimation.currentT += speed;
+    
+    if (snowballThrowAnimation.currentT > 1) {
+        snowballThrowAnimation.currentT = 1;
+    }
+    
+    const previousT = Math.max(0, snowballThrowAnimation.currentT - speed);
+    const previousPoint = path.getPoint(previousT);
+    const currentPoint = path.getPoint(snowballThrowAnimation.currentT);
+    
+    const hitResult = checkSnowballCollisionAlongPath(previousPoint, currentPoint);
+    
+    if (hitResult) {
+        console.log('Snowball collision detected, triggering morph', hitResult);
+        snowball.position.copy(hitResult.point);
+        snowballThrowAnimation.morphTriggered = true;
+        snowballThrowAnimation.impactPoint = hitResult.point;
+        morphSnowballIntoSplat();
+    } else {
+        snowball.position.copy(currentPoint);
+    }
+}
+
+/**
+ * Checks if the snowball collides with any scene objects while moving from previous to current position.
+ * 
+ * @param {THREE.Vector3} previousPosition - The snowball's previous position
+ * @param {THREE.Vector3} currentPosition - The snowball's current position
+ * @returns {Object|null} - Returns { point: hitPoint } if collision detected, null otherwise
+ */
+function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
+    const snowballRadius = 0.3;
+    const raycaster = new THREE.Raycaster();
+    
+    // Set camera on raycaster to avoid sprite raycasting errors
+    raycaster.camera = camera;
+    
+    // Get all 3D objects from sceneObjects
+    const objectsToCheck = sceneObjects.filter(obj => obj instanceof THREE.Object3D);
+    
+    // Also search the scene for collision objects (trees, snowmen, cottage, etc.)
+    scene.traverse((child) => {
+        if (child instanceof THREE.Group) {
+            // Check for known collision objects
+            if (child.name === 'cottageGroup' || 
+                child.name === 'snowmanGroup' || 
+                (child.name && child.name.startsWith('treeGroup')) ||
+                child.name === 'campfireGroup' ||
+                child.name === 'logGroup') {
+                if (!objectsToCheck.includes(child)) {
+                    objectsToCheck.push(child);
+                }
+            }
+        }
+    });
+    
+    // Debug: log how many objects we're checking
+    if (objectsToCheck.length > 0) {
+        const treeCount = objectsToCheck.filter(obj => obj.name && obj.name.startsWith('treeGroup')).length;
+        // Only log occasionally to avoid spam
+        if (Math.random() < 0.01) {
+            console.log(`Checking collision against ${objectsToCheck.length} objects (${treeCount} trees)`);
+        }
+    }
+    
+    if (ground) {
+        objectsToCheck.push(ground);
+    }
+    
+    const direction = new THREE.Vector3().subVectors(currentPosition, previousPosition);
+    const distance = direction.length();
+    
+    if (distance === 0) {
+        return null;
+    }
+    
+    direction.normalize();
+    
+    raycaster.set(previousPosition, direction);
+    
+    let intersects = [];
+    try {
+        intersects = raycaster.intersectObjects(objectsToCheck, true);
+    } catch (error) {
+        // If error, check objects individually and skip sprites
+        for (const obj of objectsToCheck) {
+            try {
+                // Skip sprites to avoid camera requirement
+                if (obj.type === 'Sprite') {
+                    continue;
+                }
+                const objIntersects = raycaster.intersectObject(obj, true);
+                intersects.push(...objIntersects);
+            } catch (e) {
+                continue;
+            }
+        }
+    }
+    
+    if (intersects.length > 0) {
+        intersects.sort((a, b) => a.distance - b.distance);
+        const closestHit = intersects[0];
+        
+        // Debug logging
+        if (closestHit.object && closestHit.object.name && closestHit.object.name.includes('tree')) {
+            console.log('Tree intersection found:', {
+                distance: closestHit.distance,
+                snowballRadius: snowballRadius,
+                pathDistance: distance,
+                condition: `${closestHit.distance} >= ${snowballRadius} && ${closestHit.distance} <= ${distance + snowballRadius}`,
+                passes: closestHit.distance >= snowballRadius && closestHit.distance <= distance + snowballRadius
+            });
+        }
+        
+        // Check if hit is within the movement distance (allow hits at any distance along the path)
+        if (closestHit.distance >= 0 && closestHit.distance <= distance + snowballRadius) {
+            // Offset the hit point back along the direction to place snowball on surface
+            const hitPoint = closestHit.point.clone();
+            const offsetDirection = direction.clone().negate(); // Move back from the hit
+            hitPoint.add(offsetDirection.multiplyScalar(snowballRadius));
+            return { point: hitPoint };
+        }
+    }
+    
+    const groundHeight = getHeightAt(currentPosition.x, currentPosition.z);
+    if (currentPosition.y <= groundHeight + snowballRadius) {
+        const groundHitPoint = new THREE.Vector3(currentPosition.x, groundHeight + snowballRadius, currentPosition.z);
+        return { point: groundHitPoint };
+    }
+    
+    return null;
+}
+
+function morphSnowballIntoSplat(){
+    if (!snowballThrowAnimation) {
+        return;
+    }
+    
+    const { snowball } = snowballThrowAnimation;
+    
+    // Store reference to snowball in case animation state is cleared
+    if (!snowball) {
+        return;
+    }
+    
+    // The morph target should already exist from createSnowball()
+    if (!snowball.morphTargetInfluences || snowball.morphTargetInfluences.length === 0) {
+        console.warn('Snowball has no morph targets');
+        return;
+    }
+    
+    // Verify morph attributes exist
+    if (!snowball.geometry || !snowball.geometry.morphAttributes || !snowball.geometry.morphAttributes.position) {
+        console.warn('Snowball geometry has no morph attributes');
+        return;
+    }
+    
+    console.log('Starting snowball morph animation');
+    
+    // Play splat sound when morph starts
+    makeSplatSound();
+    
+    // Animate the morph
+    const morphStartTime = Date.now();
+    const morphDuration = 150;
+    
+    function animateMorph() {
+        // Check if snowball still exists
+        if (!snowball || !snowball.parent) {
+            console.warn('Snowball removed during morph animation');
+            return;
+        }
+        
+        const elapsed = Date.now() - morphStartTime;
+        const progress = Math.min(elapsed / morphDuration, 1);
+        
+        // Ease-out curve
+        const eased = 1 - Math.pow(1 - progress, 3);
+        snowball.morphTargetInfluences[0] = eased;
+        
+        if (progress < 1) {
+            requestAnimationFrame(animateMorph);
+        } else {
+            // Fade out after morph completes
+            setTimeout(() => {
+                fadeOutSplat(snowball);
+            }, 2000);
+        }
+    }
+    
+    animateMorph();
+}
+
+/**
+ * Fade out a splatted snowball object over a duration, then remove it from the scene.
+ * Disposes of its geometry and material to free GPU resources.
+ * 
+ * @param {THREE.Mesh} splat - The snowball splat mesh to be faded out and cleaned up.
+ *
+ * The function animates the material's opacity from 1 to 0 over 500ms,
+ * marks the material as transparent, and finally removes and disposes of the mesh, geometry, and material.
+ * It also clears the `snowballThrowAnimation` reference.
+ */
+function fadeOutSplat(splat) {
+    const fadeStartTime = Date.now();
+    const fadeDuration = 500;
+    
+    function fade() {
+        const elapsed = Date.now() - fadeStartTime;
+        const progress = Math.min(elapsed / fadeDuration, 1);
+        
+        splat.material.opacity = 1 - progress;
+        splat.material.transparent = true;
+        
+        if (progress < 1) {
+            requestAnimationFrame(fade);
+        } else {
+            if (splat && splat.parent) {
+                splat.parent.remove(splat);
+            }
+            if (splat.geometry) {
+                splat.geometry.dispose();
+            }
+            if (splat.material) {
+                splat.material.dispose();
+            }
+            snowballThrowAnimation = null;
+        }
+    }
+    
+    fade();
+}
+
+/**
+ * Plays the "splat" sound effect when a snowball hits an object.
+ * 
+ * - Ensures there is a THREE.AudioListener attached to the camera (creates and attaches one if absent).
+ * - Loads the splat sound effect from "/sounds/splat.mp3" using THREE.AudioLoader.
+ * - Sets buffer, volume (0.7), and disables looping on the playing sound.
+ * - Calls `resumeAudioContext()` to make sure the audio context is resumed (helps with browser restrictions).
+ * - Plays the sound.
+ * - Logs an error to the console if the sound file fails to load.
+ *
+ * Note: `audioListener`, `camera`, and `resumeAudioContext` must be in scope.
+ */
 function makeSplatSound() {
-
+    if (!audioListener) {
+        audioListener = new THREE.AudioListener();
+        camera.add(audioListener);
+    }
+    
+    const splatSound = new THREE.Audio(audioListener);
+    const audioLoader = new THREE.AudioLoader();
+    
+    audioLoader.load(
+        '/sounds/splat.mp3',
+        function(buffer) {
+            splatSound.setBuffer(buffer);
+            splatSound.setVolume(0.7);
+            splatSound.setLoop(false);
+            
+            resumeAudioContext();
+            splatSound.play();
+        },
+        function(error) {
+            console.error('Error loading splat sound:', error);
+        }
+    );
 }
+
+function loadWallTexture(){
+    const loader = new THREE.TextureLoader();
+    const wallTexture = loader.load(
+        '/textures/mountains.webp',
+        (texture) => {
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(1, 1);
+        },
+        undefined,
+        (error) => {
+            console.error('Error loading wall texture:', error);
+        }
+    );
+    
+    wallTexture.wrapS = THREE.RepeatWrapping;
+    wallTexture.wrapT = THREE.RepeatWrapping;
+    wallTexture.repeat.set(1, 1);
+    
+    return wallTexture;
+}
+
+function createWall(wallCorners, wallName) {
+    // wallCorners is an array of 2 Vector3 points at ground level (y=0)
+    const corner1 = wallCorners[0];
+    const corner2 = wallCorners[1];
+    
+    // Calculate the width of the wall (distance between the two corners)
+    const wallWidth = corner1.distanceTo(corner2);
+    
+    // Set wall height (half of the max height from groundBounds)
+    const wallHeight = 25;
+    
+    // Create the wall geometry
+    const wallGeometry = new THREE.PlaneGeometry(wallWidth, wallHeight);
+    const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+    
+    // Set the wall name for identification
+    if (wallName) {
+        wallMesh.name = wallName;
+    }
+    
+    // Calculate the midpoint between the two corners
+    const midpoint = new THREE.Vector3();
+    midpoint.addVectors(corner1, corner2);
+    midpoint.multiplyScalar(0.5);
+    
+    // Position the wall at the midpoint, with the bottom at ground level
+    wallMesh.position.set(midpoint.x, wallHeight / 2 - 5, midpoint.z);
+    
+    // Calculate the direction vector along the wall (from corner1 to corner2)
+    const wallDirection = new THREE.Vector3();
+    wallDirection.subVectors(corner2, corner1);
+    wallDirection.normalize();
+    
+    // Calculate the outward direction (from scene center to midpoint)
+    const outwardDirection = new THREE.Vector3();
+    outwardDirection.copy(midpoint);
+    outwardDirection.normalize();
+    
+    // Calculate the normal to the wall (perpendicular to wallDirection, pointing outward)
+    // The wall should be perpendicular to the line between corners and face outward
+    const wallNormal = new THREE.Vector3();
+    wallNormal.crossVectors(wallDirection, new THREE.Vector3(0, 1, 0));
+    
+    // Determine which direction is outward by checking the dot product with outwardDirection
+    if (wallNormal.dot(outwardDirection) < 0) {
+        wallNormal.negate();
+    }
+    
+    // Calculate rotation angle to face the wall outward
+    const angle = Math.atan2(wallNormal.x, wallNormal.z);
+    wallMesh.rotation.y = angle;
+    
+    // Set shadow properties
+    wallMesh.castShadow = true;
+    wallMesh.receiveShadow = true;
+    
+    return wallMesh;
+}
+
+function determineWallCorners(){
+    const groundCorners = [];
+    const frontLeftCorner = new THREE.Vector3(groundBounds.xMin, 0, groundBounds.zMin);
+    const frontRightCorner = new THREE.Vector3(groundBounds.xMax, 0, groundBounds.zMin);
+    const backLeftCorner = new THREE.Vector3(groundBounds.xMin, 0, groundBounds.zMax);
+    const backRightCorner = new THREE.Vector3(groundBounds.xMax, 0, groundBounds.zMax);
+
+    groundCorners.push(frontLeftCorner);
+    groundCorners.push(frontRightCorner);
+    groundCorners.push(backLeftCorner);
+    groundCorners.push(backRightCorner);
+
+    return groundCorners;
+}
+
+function determineFrontWallBounds(){
+    const wallCorners = determineWallCorners();
+    const frontWallCorners = [];
+    const frontLeftCorner = wallCorners[0];
+    const frontRightCorner = wallCorners[1];
+    frontWallCorners.push(frontLeftCorner);
+    frontWallCorners.push(frontRightCorner);
+    return frontWallCorners;
+    //all are gonna have the same height, so do that in later function?
+}
+
+function determineBackWallBounds(){
+    const wallCorners = determineWallCorners();
+    const backWallCorners = [];
+    const backLeftCorner = wallCorners[2];
+    const backRightCorner = wallCorners[3];
+    backWallCorners.push(backLeftCorner);
+    backWallCorners.push(backRightCorner);
+    return backWallCorners;
+    //all are gonna have the same height, so do that in later function?
+}
+
+function determineLeftWallBounds(){
+    const wallCorners = determineWallCorners();
+    const leftWallCorners = [];
+    const leftFrontCorner = wallCorners[0];
+    const leftBackCorner = wallCorners[2];
+    leftWallCorners.push(leftFrontCorner);
+    leftWallCorners.push(leftBackCorner);
+    return leftWallCorners;
+    //all are gonna have the same height, so do that in later function?
+}
+
+function determineRightWallBounds(){
+    const wallCorners = determineWallCorners();
+    const rightWallCorners = [];
+    const rightFrontCorner = wallCorners[1];
+    const rightBackCorner = wallCorners[3];
+    rightWallCorners.push(rightFrontCorner);
+    rightWallCorners.push(rightBackCorner);
+    return rightWallCorners;
+    //all are gonna have the same height, so do that in later function?
+}
+
+function generateWalls(){
+    const frontWall = createWall(determineFrontWallBounds(), 'frontWall');
+    const backWall = createWall(determineBackWallBounds(), 'backWall');
+    const leftWall = createWall(determineLeftWallBounds(), 'leftWall');
+    const rightWall = createWall(determineRightWallBounds(), 'rightWall');
+    scene.add(frontWall);
+    scene.add(backWall);
+    scene.add(leftWall);
+    scene.add(rightWall);
+    
+    // Add walls to sceneObjects for collision detection
+    sceneObjects.push(frontWall);
+    sceneObjects.push(backWall);
+    sceneObjects.push(leftWall);
+    sceneObjects.push(rightWall);
+}
+
+/*
+const groundBounds = {
+    xMin: -100,
+    xMax: 100,
+    zMin: -50,
+    zMax: 50,
+    yMin: -10,
+    yMax: 100
+};
+*/
 
 /**
  * Creates, configures, loads, and starts a looping THREE.PositionalAudio sound 
@@ -2896,8 +3836,6 @@ export function startAudio() {
 export async function setupOutdoorScene() {    
     setupLights();
     createGround();
-    //createMoon();
-    //await generateClouds();
     await generateElfAtOrigin();
 
     cottage = await generateCottage();
@@ -2912,10 +3850,8 @@ export async function setupOutdoorScene() {
     initKeyboardListeners();
     createNorthernLights();
     createSnowballPile();
+    generateWalls();
     await addCandyToPath(createPath());
-    //createPath();
-    document.addEventListener('click', startAudio);
-    document.addEventListener('keydown', startAudio);
     console.log('Scene setup complete');
     return { scene, camera };
 }
