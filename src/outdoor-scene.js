@@ -16,7 +16,21 @@ export let northernLights = null;
 let snowmanGroup = null;
 let campfireGroup = null;
 
-let ballGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+let ballGeometry = new THREE.SphereGeometry(1, 32, 32);
+const snowballGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+const noseGeometry = new THREE.ConeGeometry(0.15, 0.5, 32);
+const bottomHatGeometry = new THREE.CylinderGeometry(1, 1, 0.2, 32);
+const topHatGeometry = new THREE.CylinderGeometry(0.75, 0.75, 1, 32);
+
+const trunkGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
+const treeBottomGeometry = new THREE.CylinderGeometry(1.5, 3, 2.25, 32);
+const treeMiddleGeometry = new THREE.CylinderGeometry(1, 2.25, 2.25, 32);
+const treeTopGeometry = new THREE.ConeGeometry(1.5, 2.25, 32);
+const bottomSnowGeometry = new THREE.CylinderGeometry(2.8, 3.1, 0.5, 32);
+const middleSnowGeometry = new THREE.CylinderGeometry(2.1, 2.35, 0.5, 32);
+const topSnowGeometry = new THREE.CylinderGeometry(1.45, 1.75, 0.5, 32);
+
+
 
 const snowMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -24,8 +38,23 @@ const snowMaterial = new THREE.MeshStandardMaterial({
     map: loadSnowTexture()
 });
 
+const noseMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffa500,
+    side: THREE.DoubleSide
+});
+
+const blackMaterial = new THREE.MeshStandardMaterial({
+    color: 0x000000,
+    side: THREE.DoubleSide
+});
+
 const treeMaterial = new THREE.MeshStandardMaterial({
     color: 0x023020,
+    side: THREE.DoubleSide
+});
+
+const trunkMaterial = new THREE.MeshStandardMaterial({
+    color: 0x654321,
     side: THREE.DoubleSide
 });
 
@@ -1601,8 +1630,8 @@ function loadIceTexture(){
  * @returns {THREE.Mesh} The mesh representing the snowman's bottom sphere.
  */
 function createSnowmanBottom() {
-    const snowmanGeometry = new THREE.SphereGeometry(2, 32, 32);
-    const snowmanBottom = new THREE.Mesh(snowmanGeometry, snowMaterial);
+    const snowmanBottom = new THREE.Mesh(ballGeometry, snowMaterial);
+    snowmanBottom.scale.setScalar(2);
     snowmanBottom.position.set(0, 1, 0);
     snowmanBottom.castShadow = true;
     snowmanBottom.receiveShadow = true;
@@ -1621,8 +1650,8 @@ function createSnowmanBottom() {
  * @returns {THREE.Mesh} The mesh representing the snowman's middle sphere.
  */
 function createSnowmanMiddle(){
-    const snowmanGeometry = new THREE.SphereGeometry(1.5, 32, 32);
-    const snowmanMiddle = new THREE.Mesh(snowmanGeometry, snowMaterial);
+    const snowmanMiddle = new THREE.Mesh(ballGeometry, snowMaterial);
+    snowmanMiddle.scale.setScalar(1.5);
     snowmanMiddle.position.set(0, 3, 0);
     snowmanMiddle.castShadow = true;
     snowmanMiddle.receiveShadow = true;
@@ -1642,8 +1671,7 @@ function createSnowmanMiddle(){
  * @returns {THREE.Mesh} The mesh representing the snowman's top sphere.
  */
 function createSnowmanTop(){
-    const snowmanGeometry = new THREE.SphereGeometry(1, 32, 32);
-    const snowmanTop = new THREE.Mesh(snowmanGeometry, snowMaterial);
+    const snowmanTop = new THREE.Mesh(ballGeometry, snowMaterial);
     snowmanTop.position.set(0, 5, 0);
     snowmanTop.castShadow = true;
     snowmanTop.receiveShadow = true;
@@ -1683,12 +1711,7 @@ function createSnowmanHat(){
  * @returns {THREE.Mesh} The mesh representing the bottom of the snowman's hat.
  */
 function createSnowmanHatBottom(){
-    const hatGeometry = new THREE.CylinderGeometry(1, 1, 0.2, 32);
-    const hatMaterial = new THREE.MeshStandardMaterial({
-        color: 0x000000,
-        side: THREE.DoubleSide
-    });
-    const snowmanHatBottom = new THREE.Mesh(hatGeometry, hatMaterial);
+    const snowmanHatBottom = new THREE.Mesh(bottomHatGeometry, blackMaterial);
     snowmanHatBottom.position.set(0, 6, 0);
     snowmanHatBottom.castShadow = true;
     snowmanHatBottom.receiveShadow = true;
@@ -1708,12 +1731,7 @@ function createSnowmanHatBottom(){
  * @returns {THREE.Mesh} The mesh representing the top cylinder of the snowman's hat.
  */
 function createSnowmanHatTop(){
-    const hatGeometry = new THREE.CylinderGeometry(0.75, 0.75, 1, 32);
-    const hatMaterial = new THREE.MeshStandardMaterial({
-        color: 0x000000,
-        side: THREE.DoubleSide
-    });
-    const snowmanHatTop = new THREE.Mesh(hatGeometry, hatMaterial);
+    const snowmanHatTop = new THREE.Mesh(topHatGeometry, blackMaterial);
     snowmanHatTop.position.set(0, 6.5, 0);
     snowmanHatTop.castShadow = true;
     snowmanHatTop.receiveShadow = true;
@@ -1721,23 +1739,22 @@ function createSnowmanHatTop(){
 }
 
 /**
- * Creates a single piece of coal for use in a snowman face (eyes, mouth, etc.).
+ * Creates a single piece of coal for use in a snowman face (eyes, mouth, buttons, etc.).
  *
- * This function constructs a small black sphere mesh using THREE.SphereGeometry
- * and MeshStandardMaterial. The sphere is sized to resemble a piece of coal,
- * with a radius of 0.1 units, and is set to both cast and receive shadows
+ * This function constructs a black sphere mesh by reusing the global `ballGeometry`
+ * (which has radius 1) and scaling it to the desired size. The sphere uses
+ * MeshStandardMaterial with black color and is set to both cast and receive shadows
  * for realistic appearance in the scene. The mesh is suitable for use as
- * snowman facial features such as eyes or smile components.
+ * snowman facial features such as eyes, smile components, or buttons.
  *
+ * @param {number} [scale=0.1] - The scale factor to apply to the ballGeometry. 
+ *                                Defaults to 0.1, which results in a radius of 0.1 units.
+ *                                For example, use 0.15 for buttons that should be 1.5x larger than eyes.
  * @returns {THREE.Mesh} The mesh representing a single coal piece.
  */
-function createCoalPiece(){
-    const coalGeometry = new THREE.SphereGeometry(0.1, 32, 32);
-    const coalMaterial = new THREE.MeshStandardMaterial({
-        color: 0x000000,
-        side: THREE.DoubleSide
-    });
-    const coalPiece = new THREE.Mesh(coalGeometry, coalMaterial);
+function createCoalPiece(scale = 0.1){
+    const coalPiece = new THREE.Mesh(ballGeometry, blackMaterial);
+    coalPiece.scale.setScalar(scale);
     coalPiece.castShadow = true;
     coalPiece.receiveShadow = true;
     return coalPiece;
@@ -1775,11 +1792,6 @@ function createSnowmanEyes(){
  * @returns {THREE.Mesh} The mesh representing the snowman's carrot nose.
  */
 function createSnowmanNose(){
-    const noseGeometry = new THREE.ConeGeometry(0.15, 0.5, 32);
-    const noseMaterial = new THREE.MeshStandardMaterial({
-        color: 0xffa500,
-        side: THREE.DoubleSide
-    });
     const snowmanNose = new THREE.Mesh(noseGeometry, noseMaterial);
     snowmanNose.position.set(0, 5, 1.25);
     snowmanNose.rotation.x = Math.PI / 2;
@@ -1859,12 +1871,9 @@ function createSnowmanFace(){
  */
 function createSnowmanButtons(){
     const buttonsGroup = new THREE.Group();
-    const button1 = createCoalPiece();
-    const button2 = createCoalPiece();
-    const button3 = createCoalPiece();
-    button1.scale.set(1.5, 1.5, 1.5);
-    button2.scale.set(1.5, 1.5, 1.5);
-    button3.scale.set(1.5, 1.5, 1.5);
+    const button1 = createCoalPiece(0.15);
+    const button2 = createCoalPiece(0.15);
+    const button3 = createCoalPiece(0.15);
     button1.position.set(0, 3.85, 1.25);
     button2.position.set(0, 3, 1.5);
     button3.position.set(0, 1.75, 1.85);
@@ -1909,11 +1918,6 @@ function createSnowman(x, z) {
  * @returns {THREE.Mesh} The mesh representing the tree trunk.
  */
 function createTreeTrunk(){
-    const trunkGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
-    const trunkMaterial = new THREE.MeshStandardMaterial({
-        color: 0x654321,
-        side: THREE.DoubleSide
-    });
     const trunkMesh = new THREE.Mesh(trunkGeometry, trunkMaterial);
     trunkMesh.position.set(0, 0.5, 0);
     trunkMesh.castShadow = true;
@@ -1931,8 +1935,7 @@ function createTreeTrunk(){
  * @returns {THREE.Mesh} The mesh representing the bottom foliage section of the pine tree.
  */
 function createTreeBottom(){
-    const bottomGeom = new THREE.CylinderGeometry(1.5, 3, 2.25, 32);
-    const bottomMesh = new THREE.Mesh(bottomGeom, treeMaterial);
+    const bottomMesh = new THREE.Mesh(treeBottomGeometry, treeMaterial);
     bottomMesh.position.set(0, 2, 0);
     bottomMesh.castShadow = true;
     bottomMesh.receiveShadow = true;
@@ -1949,8 +1952,7 @@ function createTreeBottom(){
  * @returns {THREE.Mesh} The mesh representing the middle foliage section of the pine tree.
  */
 function createTreeMiddle(){
-    const middleGeom = new THREE.CylinderGeometry(1, 2.25, 2.25, 32);
-    const middleMesh = new THREE.Mesh(middleGeom, treeMaterial);
+    const middleMesh = new THREE.Mesh(treeMiddleGeometry, treeMaterial);
     middleMesh.position.set(0, 4.25, 0);
     middleMesh.castShadow = true;
     middleMesh.receiveShadow = true;
@@ -1967,8 +1969,7 @@ function createTreeMiddle(){
  * @returns {THREE.Mesh} The mesh representing the top foliage section of the pine tree.
  */
 function createTreeTop(){
-    const topGeom = new THREE.ConeGeometry(1.5, 2.25, 32);
-    const topMesh = new THREE.Mesh(topGeom, treeMaterial);
+    const topMesh = new THREE.Mesh(treeTopGeometry, treeMaterial);
     topMesh.position.set(0, 6.5, 0);
     topMesh.castShadow = true;
     topMesh.receiveShadow = true;
@@ -1987,8 +1988,7 @@ function createTreeTop(){
  * @returns {THREE.Mesh} The mesh representing the bottom snow layer of the tree.
  */
 function createBottomTreeSnow(){
-    const bottomSnowGeom = new THREE.CylinderGeometry(2.8, 3.1, 0.5, 32);
-    const bottomSnowMesh = new THREE.Mesh(bottomSnowGeom, snowMaterial);
+    const bottomSnowMesh = new THREE.Mesh(bottomSnowGeometry, snowMaterial);
     bottomSnowMesh.position.set(0, 1, 0);
     bottomSnowMesh.castShadow = true;
     bottomSnowMesh.receiveShadow = true;
@@ -2007,8 +2007,7 @@ function createBottomTreeSnow(){
  * @returns {THREE.Mesh} The mesh representing the middle snow layer of the tree.
  */
 function createMiddleTreeSnow(){
-    const middleSnowGeom = new THREE.CylinderGeometry(2.1, 2.35, 0.5, 32);
-    const middleSnowMesh = new THREE.Mesh(middleSnowGeom, snowMaterial);
+    const middleSnowMesh = new THREE.Mesh(middleSnowGeometry, snowMaterial);
     middleSnowMesh.position.set(0, 3.25, 0);
     middleSnowMesh.castShadow = true;
     middleSnowMesh.receiveShadow = true;
@@ -2027,8 +2026,7 @@ function createMiddleTreeSnow(){
  * @returns {THREE.Mesh} The mesh representing the top snow layer of the tree.
  */
 function createTopTreeSnow(){
-    const topSnowGeom = new THREE.CylinderGeometry(1.45, 1.75, 0.5, 32);
-    const topSnowMesh = new THREE.Mesh(topSnowGeom, snowMaterial);
+    const topSnowMesh = new THREE.Mesh(topSnowGeometry, snowMaterial);
     topSnowMesh.position.set(0, 5.25, 0);
     topSnowMesh.castShadow = true;
     topSnowMesh.receiveShadow = true;
@@ -2954,7 +2952,7 @@ export function makeSnowmanSpeak(){
  * @returns {THREE.Mesh} The snowball mesh with morph target.
  */
 function createSnowball(){
-    const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+    const geometry = snowballGeometry.clone();
     
     const positionAttribute = geometry.attributes.position;
     const morphPositions = [];
