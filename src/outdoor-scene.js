@@ -302,18 +302,17 @@ function modifyTerrainHeights(geometry) {
  *   - Adds the ground to the global scene.
  */
 function createGround(){
-    // TO DO: make the ground smoother (get rid of the lines and make it smooth)
     const groundGeometry = new THREE.PlaneGeometry(200, 100, 50, 25);
     
     modifyTerrainHeights(groundGeometry);
 
     ground = new THREE.Mesh(groundGeometry, snowMaterial);
-    ground.name = 'ground'; // Add name for identification
+    ground.name = 'ground';
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
     ground.castShadow = true;
     ground.receiveShadow = true;
-    ground.visible = true; // Ensure it's visible
+    ground.visible = true;
     scene.add(ground);
 }
 
@@ -499,7 +498,6 @@ async function generateElfAtOrigin(){
 function checkGroundBounds(x, z) {
     const collisionRadius = 0.5;
     
-    // Check if position (accounting for collision radius) is within ground bounds
     if (x - collisionRadius < groundBounds.xMin || x + collisionRadius > groundBounds.xMax) {
         return false;
     }
@@ -671,19 +669,15 @@ export function moveElf(){
     }
     
     try {
-        // First check if the new position is within ground bounds
         if (!checkGroundBounds(newX, newZ)) {
-            return; // Don't move if outside ground bounds
+            return;
         }
         
-        // Then check for collisions with scene objects
         if (!checkElfCollision(newX, newZ)) {
             elfGroup.position.x = newX;
             elfGroup.position.z = newZ;
         }
     } catch (error) {
-        console.error('Collision check error in moveElf:', error);
-        // Only update position if within bounds even on error
         if (checkGroundBounds(newX, newZ)) {
             elfGroup.position.x = newX;
             elfGroup.position.z = newZ;
