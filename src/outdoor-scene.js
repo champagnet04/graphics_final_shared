@@ -229,31 +229,27 @@ export function followElf(){
  * No parameters; lights are added to the global scene as a side effect.
  */
 function setupLights(){
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // soft white light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // bright white light
-    directionalLight.position.set(10, 100, 10); // Position the light
-    directionalLight.castShadow = true; // Enable shadow casting
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    directionalLight.position.set(10, 100, 10);
+    directionalLight.castShadow = true;
     
-    // Configure shadow map for directional light
-    // The shadow camera needs to cover the area where shadows will be cast
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.camera.near = 0.5;
     directionalLight.shadow.camera.far = 500;
-    // Adjust bounds to cover the ground area where clouds cast shadows
     directionalLight.shadow.camera.left = -150;
     directionalLight.shadow.camera.right = 150;
     directionalLight.shadow.camera.top = 150;
     directionalLight.shadow.camera.bottom = -150;
     
-    // Update the shadow camera to look at the scene center
     directionalLight.target.position.set(0, 0, 0);
     directionalLight.target.updateMatrixWorld();
     
     scene.add(directionalLight);
-    scene.add(directionalLight.target); // Add target to scene
+    scene.add(directionalLight.target);
 }
 
 /**
