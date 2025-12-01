@@ -63,7 +63,7 @@ const wallMaterial = new THREE.MeshStandardMaterial({
     side: THREE.DoubleSide,
     map: loadWallTexture(),
     transparent: true,
-    opacity: 0.7
+    alphaTest: 0.5
 });
 
 let sceneObjects = [];
@@ -3571,10 +3571,10 @@ function makeSplatSound() {
     );
 }
 
-function loadWallTexture(){
+function loadWallTexture() {
     const loader = new THREE.TextureLoader();
     const wallTexture = loader.load(
-        '/textures/mountains.webp',
+        '/textures/mountains.png',
         (texture) => {
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.RepeatWrapping;
