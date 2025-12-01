@@ -3725,7 +3725,7 @@ function addJazzToHouse(cottageGroup){
     const audioLoader = new THREE.AudioLoader();
     
     jazzMusicSound = jazzMusic;
-    jazzMusic.position.set(0, 0, 0);
+    jazzMusic.position.set(25, 0, 10);
     
     audioLoader.load(
         '/sounds/christmas-jazz.mp3',
