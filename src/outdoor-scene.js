@@ -63,7 +63,8 @@ const wallMaterial = new THREE.MeshStandardMaterial({
     side: THREE.DoubleSide,
     map: loadWallTexture(),
     transparent: true,
-    opacity: 0.7
+    opacity: 0.8,
+    alphaTest: 0.5
 });
 
 let sceneObjects = [];
@@ -71,7 +72,7 @@ let audioListener = null;
 let fireCrackleSound = null;
 let jazzMusicSound = null;
 const keysPressed = {};
-let snowballThrowAnimation = null; // { snowball, path, impactT, currentT, speed }
+let snowballThrowAnimation = null;
 
 const groundBounds = {
     xMin: -100,
@@ -2631,15 +2632,6 @@ function makeFireCrackle(fire){
     );
 }
 
-function loadStoneTexture(){
-    const loader = new THREE.TextureLoader();
-    const stoneTexture = loader.load('/textures/stone.png');
-    stoneTexture.wrapS = THREE.RepeatWrapping;
-    stoneTexture.wrapT = THREE.RepeatWrapping;
-    stoneTexture.repeat.set(10, 10);
-    return stoneTexture;
-}
-
 async function loadPeppermint(){
     const loader = new GLTFLoader();
     try {
@@ -3470,6 +3462,18 @@ function makeSplatSound() {
     );
 }
 
+/**
+ * Loads and configures the wall texture used for the scene boundaries.
+ *
+ * - Loads the wall texture from '/textures/mountains.webp' using THREE.TextureLoader.
+ * - Sets the texture's wrapping mode to repeat in both S and T (horizontal and vertical) directions.
+ * - Repeats the texture 1 time in each direction for proper display on the wall meshes.
+ * - Handles errors if the texture fails to load and logs them to the console.
+ * - Ensures wrapping and repeat settings are applied both in the onLoad callback (for async loads)
+ *   and immediately after load (for synchronous loads, e.g., from browser cache).
+ *
+ * @returns {THREE.Texture} The configured wall texture ready to use in a material.
+ */
 function loadWallTexture(){
     const loader = new THREE.TextureLoader();
     const wallTexture = loader.load(
@@ -3492,6 +3496,23 @@ function loadWallTexture(){
     return wallTexture;
 }
 
+/**
+ * Creates a wall mesh between two corner points with optional naming.
+ *
+ * This function constructs a vertical wall using a PlaneGeometry stretched between
+ * the two provided corner points (as THREE.Vector3) in the XZ plane. The wall is
+ * given a fixed height, uses the globally defined wallMaterial, and is positioned and rotated
+ * such that it faces outward from the center of the scene, forming a scene boundary or enclosure.
+ * Each wall mesh is centered between its corners and rotated around the Y axis to align with
+ * the segment defined by wallCorners[0] and wallCorners[1]. The wall can optionally be assigned
+ * a name for later reference in the scene graph.
+ *
+ * The mesh is configured to both cast and receive shadows for lighting effects.
+ *
+ * @param {THREE.Vector3[]} wallCorners - An array containing exactly two THREE.Vector3 objects specifying the endpoints of the wall.
+ * @param {string} [wallName] - Optional name for the wall mesh.
+ * @returns {THREE.Mesh} The created wall mesh, positioned and rotated appropriately.
+ */
 function createWall(wallCorners, wallName) {
     const corner1 = wallCorners[0];
     const corner2 = wallCorners[1];
@@ -3537,6 +3558,21 @@ function createWall(wallCorners, wallName) {
     return wallMesh;
 }
 
+/**
+ * Returns the four corners of the ground plane as THREE.Vector3 objects.
+ *
+ * This function calculates the corners using the global `groundBounds` object that defines
+ * the minimum and maximum x and z coordinates of the ground. The corners are provided in the
+ * following order:
+ *   0: Front left  (xMin, 0, zMin)
+ *   1: Front right (xMax, 0, zMin)
+ *   2: Back left   (xMin, 0, zMax)
+ *   3: Back right  (xMax, 0, zMax)
+ *
+ * These corners are typically used for constructing scene walls or boundary-related objects.
+ *
+ * @returns {THREE.Vector3[]} An array of four THREE.Vector3 instances corresponding to ground corners.
+ */
 function determineWallCorners(){
     const groundCorners = [];
     const frontLeftCorner = new THREE.Vector3(groundBounds.xMin, 0, groundBounds.zMin);
@@ -3552,6 +3588,16 @@ function determineWallCorners(){
     return groundCorners;
 }
 
+/**
+ * Determines and returns the bounds (endpoints) of the front wall of the ground plane.
+ *
+ * This function calls `determineWallCorners()` to retrieve the four corners of the ground,
+ * then extracts the front left and front right corners, representing the wall that runs along
+ * the front (minimum Z) edge of the ground area. The returned array contains these two
+ * THREE.Vector3 instances, corresponding to the endpoints for constructing the front wall.
+ *
+ * @returns {THREE.Vector3[]} An array containing [frontLeftCorner, frontRightCorner].
+ */
 function determineFrontWallBounds(){
     const wallCorners = determineWallCorners();
     const frontWallCorners = [];
@@ -3562,6 +3608,16 @@ function determineFrontWallBounds(){
     return frontWallCorners;
 }
 
+/**
+ * Determines and returns the bounds (endpoints) of the back wall of the ground plane.
+ *
+ * This function calls `determineWallCorners()` to retrieve the four corners of the ground,
+ * then extracts the back left and back right corners, representing the wall that runs along
+ * the back (maximum Z) edge of the ground area. The returned array contains these two
+ * THREE.Vector3 instances, corresponding to the endpoints for constructing the back wall.
+ *
+ * @returns {THREE.Vector3[]} An array containing [backLeftCorner, backRightCorner].
+ */
 function determineBackWallBounds(){
     const wallCorners = determineWallCorners();
     const backWallCorners = [];
@@ -3572,6 +3628,16 @@ function determineBackWallBounds(){
     return backWallCorners;
 }
 
+/**
+ * Determines and returns the bounds (endpoints) of the left wall of the ground plane.
+ *
+ * This function calls `determineWallCorners()` to retrieve the four corners of the ground,
+ * then extracts the front left and back left corners, representing the wall that runs along
+ * the left (minimum X) edge of the ground area. The returned array contains these two
+ * THREE.Vector3 instances, corresponding to the endpoints for constructing the left wall.
+ *
+ * @returns {THREE.Vector3[]} An array containing [leftFrontCorner, leftBackCorner].
+ */
 function determineLeftWallBounds(){
     const wallCorners = determineWallCorners();
     const leftWallCorners = [];
@@ -3582,6 +3648,16 @@ function determineLeftWallBounds(){
     return leftWallCorners;
 }
 
+/**
+ * Determines and returns the bounds (endpoints) of the right wall of the ground plane.
+ *
+ * This function calls `determineWallCorners()` to retrieve the four corners of the ground,
+ * then extracts the front right and back right corners, which represent the wall that runs along
+ * the right (maximum X) edge of the ground area. The returned array contains these two
+ * THREE.Vector3 instances, corresponding to the endpoints for constructing the right wall.
+ *
+ * @returns {THREE.Vector3[]} An array containing [rightFrontCorner, rightBackCorner].
+ */
 function determineRightWallBounds(){
     const wallCorners = determineWallCorners();
     const rightWallCorners = [];
@@ -3592,6 +3668,29 @@ function determineRightWallBounds(){
     return rightWallCorners;
 }
 
+/**
+ * Generates and adds all four perimeter walls (front, back, left, right) around the ground area.
+ *
+ * This function constructs one wall for each side of the ground plane by:
+ *   - Determining the bounds (start and end points) for each wall using the helper functions:
+ *       - determineFrontWallBounds()
+ *       - determineBackWallBounds()
+ *       - determineLeftWallBounds()
+ *       - determineRightWallBounds()
+ *   - Calling `createWall()` for each set of bounds, passing a descriptive name (e.g., 'frontWall').
+ *   - Adding all four resulting wall meshes to the global scene.
+ *   - Adding each wall mesh to the `sceneObjects` array for later collision and proximity checks.
+ *
+ * Side effects:
+ *   - Walls are added as THREE.Mesh (or Group) objects to the scene and to sceneObjects.
+ *
+ * Dependencies:
+ *   - `scene`: Global THREE.Scene instance.
+ *   - `sceneObjects`: Global array maintaining interactive objects in the scene.
+ *   - `createWall(bounds, name)`: Function that generates a wall mesh from given bounds.
+ *
+ * @returns {void}
+ */
 function generateWalls(){
     const frontWall = createWall(determineFrontWallBounds(), 'frontWall');
     const backWall = createWall(determineBackWallBounds(), 'backWall');
@@ -3608,6 +3707,16 @@ function generateWalls(){
     sceneObjects.push(rightWall);
 }
 
+/**
+ * Adds a looping positional jazz music audio source to the provided cottage group.
+ *
+ * This function creates a THREE.PositionalAudio object attached to the global audio listener (adding the listener to the camera if necessary).
+ * Loads the 'christmas-jazz.mp3' file asynchronously, sets up positional audio parameters (reference distance, max distance, rolloff, looping, volume),
+ * and then attaches the sound to the given cottage group. The audio object is also stored in the global jazzMusicSound variable for later access.
+ * 
+ * @param {THREE.Group} cottageGroup - The 3D group representing the cottage to which the jazz music should be added as a positional audio source.
+ * @returns {void}
+ */
 function addJazzToHouse(cottageGroup){
     if (!cottageGroup) {
         return;
@@ -3640,6 +3749,36 @@ function addJazzToHouse(cottageGroup){
     );
 }
 
+/**
+ * Initializes and sets up the entire outdoor scene.
+ *
+ * This asynchronous function sets up a full wintry outdoor environment, assembling all objects, effects,
+ * and audio that make up the scene. It performs the following steps (in order):
+ *   1. Initializes scene lighting.
+ *   2. Creates and adds the ground mesh.
+ *   3. Loads and places the elf character at the origin.
+ *   4. Generates the cottage and adds decorative Christmas lights.
+ *   5. Generates ambient snowfall.
+ *   6. Creates a frozen pond.
+ *   7. Assembles the campfire and attaches positional fire crackle audio.
+ *   8. Adds logs around the campfire.
+ *   9. Creates several snowmen across the scene.
+ *   10. Generates trees.
+ *   11. Sets up keyboard listeners for user interaction.
+ *   12. Adds northern lights (aurora effect) in the scene.
+ *   13. Creates a snowball pile.
+ *   14. Generates perimeter walls.
+ *   15. Adds decorative candies along a looping path around the scene.
+ *   16. Adds positional jazz music to the cottage.
+ *
+ * All assets, meshes, and effects are added to the main scene.
+ * Returns the top-level scene and camera objects, ready for rendering.
+ *
+ * @async
+ * @export
+ * @function setupOutdoorScene
+ * @returns {Promise<{scene: THREE.Scene, camera: THREE.Camera}>} The initialized scene and camera.
+ */
 export async function setupOutdoorScene(){    
     setupLights();
     createGround();
