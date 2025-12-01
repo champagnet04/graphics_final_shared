@@ -3372,16 +3372,12 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
     const snowballRadius = 0.3;
     const raycaster = new THREE.Raycaster();
     
-    // Set camera on raycaster to avoid sprite raycasting errors
     raycaster.camera = camera;
     
-    // Get all 3D objects from sceneObjects
     const objectsToCheck = sceneObjects.filter(obj => obj instanceof THREE.Object3D);
     
-    // Also search the scene for collision objects (trees, snowmen, cottage, etc.)
     scene.traverse((child) => {
         if (child instanceof THREE.Group) {
-            // Check for known collision objects
             if (child.name === 'cottageGroup' || 
                 child.name === 'snowmanGroup' || 
                 (child.name && child.name.startsWith('treeGroup')) ||
@@ -3393,15 +3389,6 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
             }
         }
     });
-    
-    // Debug: log how many objects we're checking
-    if (objectsToCheck.length > 0) {
-        const treeCount = objectsToCheck.filter(obj => obj.name && obj.name.startsWith('treeGroup')).length;
-        // Only log occasionally to avoid spam
-        if (Math.random() < 0.01) {
-            console.log(`Checking collision against ${objectsToCheck.length} objects (${treeCount} trees)`);
-        }
-    }
     
     if (ground) {
         objectsToCheck.push(ground);
@@ -3422,10 +3409,8 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
     try {
         intersects = raycaster.intersectObjects(objectsToCheck, true);
     } catch (error) {
-        // If error, check objects individually and skip sprites
         for (const obj of objectsToCheck) {
             try {
-                // Skip sprites to avoid camera requirement
                 if (obj.type === 'Sprite') {
                     continue;
                 }
@@ -3441,7 +3426,6 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
         intersects.sort((a, b) => a.distance - b.distance);
         const closestHit = intersects[0];
         
-        // Debug logging
         if (closestHit.object && closestHit.object.name && closestHit.object.name.includes('tree')) {
             console.log('Tree intersection found:', {
                 distance: closestHit.distance,
@@ -3452,11 +3436,9 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
             });
         }
         
-        // Check if hit is within the movement distance (allow hits at any distance along the path)
         if (closestHit.distance >= 0 && closestHit.distance <= distance + snowballRadius) {
-            // Offset the hit point back along the direction to place snowball on surface
             const hitPoint = closestHit.point.clone();
-            const offsetDirection = direction.clone().negate(); // Move back from the hit
+            const offsetDirection = direction.clone().negate();
             hitPoint.add(offsetDirection.multiplyScalar(snowballRadius));
             return { point: hitPoint };
         }
@@ -3478,18 +3460,15 @@ function morphSnowballIntoSplat(){
     
     const { snowball } = snowballThrowAnimation;
     
-    // Store reference to snowball in case animation state is cleared
     if (!snowball) {
         return;
     }
     
-    // The morph target should already exist from createSnowball()
     if (!snowball.morphTargetInfluences || snowball.morphTargetInfluences.length === 0) {
         console.warn('Snowball has no morph targets');
         return;
     }
     
-    // Verify morph attributes exist
     if (!snowball.geometry || !snowball.geometry.morphAttributes || !snowball.geometry.morphAttributes.position) {
         console.warn('Snowball geometry has no morph attributes');
         return;
@@ -3497,15 +3476,12 @@ function morphSnowballIntoSplat(){
     
     console.log('Starting snowball morph animation');
     
-    // Play splat sound when morph starts
     makeSplatSound();
     
-    // Animate the morph
     const morphStartTime = Date.now();
     const morphDuration = 150;
     
     function animateMorph() {
-        // Check if snowball still exists
         if (!snowball || !snowball.parent) {
             console.warn('Snowball removed during morph animation');
             return;
@@ -3514,14 +3490,12 @@ function morphSnowballIntoSplat(){
         const elapsed = Date.now() - morphStartTime;
         const progress = Math.min(elapsed / morphDuration, 1);
         
-        // Ease-out curve
         const eased = 1 - Math.pow(1 - progress, 3);
         snowball.morphTargetInfluences[0] = eased;
         
         if (progress < 1) {
             requestAnimationFrame(animateMorph);
         } else {
-            // Fade out after morph completes
             setTimeout(() => {
                 fadeOutSplat(snowball);
             }, 2000);
@@ -3631,58 +3605,44 @@ function loadWallTexture(){
 }
 
 function createWall(wallCorners, wallName) {
-    // wallCorners is an array of 2 Vector3 points at ground level (y=0)
     const corner1 = wallCorners[0];
     const corner2 = wallCorners[1];
     
-    // Calculate the width of the wall (distance between the two corners)
     const wallWidth = corner1.distanceTo(corner2);
     
-    // Set wall height (half of the max height from groundBounds)
     const wallHeight = 25;
     
-    // Create the wall geometry
     const wallGeometry = new THREE.PlaneGeometry(wallWidth, wallHeight);
     const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
     
-    // Set the wall name for identification
     if (wallName) {
         wallMesh.name = wallName;
     }
     
-    // Calculate the midpoint between the two corners
     const midpoint = new THREE.Vector3();
     midpoint.addVectors(corner1, corner2);
     midpoint.multiplyScalar(0.5);
     
-    // Position the wall at the midpoint, with the bottom at ground level
     wallMesh.position.set(midpoint.x, wallHeight / 2 - 5, midpoint.z);
     
-    // Calculate the direction vector along the wall (from corner1 to corner2)
     const wallDirection = new THREE.Vector3();
     wallDirection.subVectors(corner2, corner1);
     wallDirection.normalize();
     
-    // Calculate the outward direction (from scene center to midpoint)
     const outwardDirection = new THREE.Vector3();
     outwardDirection.copy(midpoint);
     outwardDirection.normalize();
     
-    // Calculate the normal to the wall (perpendicular to wallDirection, pointing outward)
-    // The wall should be perpendicular to the line between corners and face outward
     const wallNormal = new THREE.Vector3();
     wallNormal.crossVectors(wallDirection, new THREE.Vector3(0, 1, 0));
     
-    // Determine which direction is outward by checking the dot product with outwardDirection
     if (wallNormal.dot(outwardDirection) < 0) {
         wallNormal.negate();
     }
     
-    // Calculate rotation angle to face the wall outward
     const angle = Math.atan2(wallNormal.x, wallNormal.z);
     wallMesh.rotation.y = angle;
     
-    // Set shadow properties
     wallMesh.castShadow = true;
     wallMesh.receiveShadow = true;
     
@@ -3712,7 +3672,6 @@ function determineFrontWallBounds(){
     frontWallCorners.push(frontLeftCorner);
     frontWallCorners.push(frontRightCorner);
     return frontWallCorners;
-    //all are gonna have the same height, so do that in later function?
 }
 
 function determineBackWallBounds(){
@@ -3723,7 +3682,6 @@ function determineBackWallBounds(){
     backWallCorners.push(backLeftCorner);
     backWallCorners.push(backRightCorner);
     return backWallCorners;
-    //all are gonna have the same height, so do that in later function?
 }
 
 function determineLeftWallBounds(){
@@ -3734,7 +3692,6 @@ function determineLeftWallBounds(){
     leftWallCorners.push(leftFrontCorner);
     leftWallCorners.push(leftBackCorner);
     return leftWallCorners;
-    //all are gonna have the same height, so do that in later function?
 }
 
 function determineRightWallBounds(){
@@ -3745,7 +3702,6 @@ function determineRightWallBounds(){
     rightWallCorners.push(rightFrontCorner);
     rightWallCorners.push(rightBackCorner);
     return rightWallCorners;
-    //all are gonna have the same height, so do that in later function?
 }
 
 function generateWalls(){
@@ -3758,7 +3714,6 @@ function generateWalls(){
     scene.add(leftWall);
     scene.add(rightWall);
     
-    // Add walls to sceneObjects for collision detection
     sceneObjects.push(frontWall);
     sceneObjects.push(backWall);
     sceneObjects.push(leftWall);
@@ -3796,7 +3751,7 @@ function addJazzToHouse(cottageGroup){
             cottageGroup.add(jazzMusic);
             console.log('Jazz music loaded successfully');
         },
-        undefined, // onProgress callback (optional)
+        undefined,
         function(error) {
             console.warn('Jazz music file not found. Please add christmas-jazz.mp3 to src/sounds/ directory.');
             console.error('Error loading jazz music:', error);
