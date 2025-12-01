@@ -3728,6 +3728,43 @@ function generateWalls(){
     sceneObjects.push(rightWall);
 }
 
+function addJazzToHouse(cottageGroup){
+    if (!cottageGroup) {
+        console.warn('Cottage group not provided, cannot add jazz music');
+        return;
+    }
+    
+    if (!audioListener) {
+        audioListener = new THREE.AudioListener();
+        camera.add(audioListener);
+        console.log('Audio listener created and added to camera');
+    }
+    
+    const jazzMusic = new THREE.PositionalAudio(audioListener);
+    const audioLoader = new THREE.AudioLoader();
+    
+    jazzMusic.position.set(0, 0, 0);
+    
+    audioLoader.load(
+        '/sounds/christmas-jazz.mp3',
+        function(buffer) {
+            jazzMusic.setBuffer(buffer);
+            jazzMusic.setRefDistance(5);
+            jazzMusic.setMaxDistance(40);
+            jazzMusic.setRolloffFactor(8);
+            jazzMusic.setLoop(true);
+            jazzMusic.setVolume(0.4);
+            
+            cottageGroup.add(jazzMusic);
+            console.log('Jazz music loaded successfully');
+        },
+        function(error) {
+            console.warn('Jazz music file not found. Please add christmas-jazz.mp3 to src/sounds/ directory.');
+            console.error('Error loading jazz music:', error);
+        }
+    );
+}
+
 /*
 const groundBounds = {
     xMin: -100,
@@ -3743,7 +3780,7 @@ export async function setupOutdoorScene(){
     setupLights();
     createGround();
     await generateElfAtOrigin();
-    await generateCottage();
+    const cottageGroup = await generateCottage();
     addChristmasLightsToCottage();
     generateSnow();
     createIcyPond();
@@ -3757,7 +3794,7 @@ export async function setupOutdoorScene(){
     createSnowballPile();
     generateWalls();
     await addCandyToPath(createPath());
-    console.log('Scene setup complete');
+    addJazzToHouse(cottageGroup);
     return { scene, camera };
 }
 
