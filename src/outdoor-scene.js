@@ -823,18 +823,12 @@ async function loadCottage() {
                         transparent: matName === 'windowGlass',
                         opacity: matName === 'windowGlass' ? 0.5 : 1.0
                     });
-                    
-                    console.log(`Set ${matName} to RGB(${targetColor.r * 255}, ${targetColor.g * 255}, ${targetColor.b * 255})`);
-                } else {
-                    console.warn(`Unknown material: ${matName}`);
                 }
             }
         });
         
-        console.log('Cottage loaded with manual material colors');
         return cottage;
     } catch (error) {
-        console.error('Can\'t load model:', error);
         return null;
     }
 }
@@ -898,7 +892,6 @@ function getCottage() {
 function getCottageGroup(){
     const cottageGroup = scene.children.find(child => child.name === 'cottageGroup');
     if (!cottageGroup) {
-        console.warn('Cottage group not found');
         return null;
     }
     return cottageGroup;
@@ -2395,9 +2388,6 @@ async function createCampfire() {
         
         const groundHeight = getHeightAt(-75, -3);
         campfireGroup.position.set(-75, groundHeight, -3);
-        
-    } else {
-        console.warn('Campfire model failed to load');
     }
     
     sceneObjects.push(campfireGroup);
@@ -2833,7 +2823,6 @@ async function addCandyToPath(path){
     
     const peppermintTemplate = await loadPeppermint();
     if (!peppermintTemplate) {
-        console.warn('Peppermint model failed to load');
         return;
     }
     
@@ -3036,7 +3025,6 @@ export function pickUpSnowball(){
         }
     }
     if (!elf) {
-        console.warn('Elf not found, cannot pick up snowball');
         return null;
     }
     
@@ -3044,7 +3032,6 @@ export function pickUpSnowball(){
         elfGroup = elf.parent;
     }
     if (!elfGroup) {
-        console.warn('ElfGroup not found, cannot pick up snowball');
         return null;
     }
     
@@ -3080,7 +3067,6 @@ function createThrowPath(mouseX, mouseY){
         }
     }
     if (!elfGroup) {
-        console.warn('ElfGroup not found, cannot create throw path');
         return null;
     }
     
@@ -3095,7 +3081,6 @@ function createThrowPath(mouseX, mouseY){
     }
     
     if (!snowball) {
-        console.warn('Snowball not found, cannot create throw path');
         return null;
     }
     
@@ -3197,7 +3182,6 @@ export function throwSnowball(x, y){
     }
     
     if (!snowball) {
-        console.warn('No snowball in hand to throw');
         return;
     }
     
@@ -3261,7 +3245,6 @@ export function updateSnowballThrow(){
     const hitResult = checkSnowballCollisionAlongPath(previousPoint, currentPoint);
     
     if (hitResult) {
-        console.log('Snowball collision detected, triggering morph', hitResult);
         snowball.position.copy(hitResult.point);
         snowballThrowAnimation.morphTriggered = true;
         snowballThrowAnimation.impactPoint = hitResult.point;
@@ -3375,17 +3358,13 @@ function morphSnowballIntoSplat(){
     }
     
     if (!snowball.morphTargetInfluences || snowball.morphTargetInfluences.length === 0) {
-        console.warn('Snowball has no morph targets');
         return;
     }
     
     if (!snowball.geometry || !snowball.geometry.morphAttributes || !snowball.geometry.morphAttributes.position) {
-        console.warn('Snowball geometry has no morph attributes');
         return;
     }
-    
-    console.log('Starting snowball morph animation');
-    
+        
     makeSplatSound();
     
     const morphStartTime = Date.now();
@@ -3393,7 +3372,6 @@ function morphSnowballIntoSplat(){
     
     function animateMorph() {
         if (!snowball || !snowball.parent) {
-            console.warn('Snowball removed during morph animation');
             return;
         }
         
