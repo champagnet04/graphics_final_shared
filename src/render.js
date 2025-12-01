@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { setupOutdoorScene } from './outdoor-scene.js';
-import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity, makeSnowmanSpeak, pickUpSnowball, updateSnowballThrow, throwSnowball, hasSnowballInHand } from './outdoor-scene.js';
+import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity, checkCottageProximity, makeSnowmanSpeak, pickUpSnowball, updateSnowballThrow, throwSnowball, hasSnowballInHand } from './outdoor-scene.js';
 
 // Initialize the scene asynchronously
 async function init() {
@@ -100,6 +100,7 @@ async function init() {
         moveElf();
         followElf();
         checkCampfireProximity();
+        checkCottageProximity();
         updateSnow();
         updateSnowballThrow();
         if (northernLights) {

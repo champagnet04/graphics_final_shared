@@ -69,6 +69,7 @@ const wallMaterial = new THREE.MeshStandardMaterial({
 let sceneObjects = [];
 let audioListener = null;
 let fireCrackleSound = null;
+let jazzMusicSound = null;
 const keysPressed = {};
 let snowballThrowAnimation = null; // { snowball, path, impactT, currentT, speed }
 
@@ -2650,6 +2651,41 @@ export function checkCampfireProximity() {
     }
 }
 
+export function checkCottageProximity() {
+    if (!elf || !elfGroup) {
+        return;
+    }
+    
+    if (!audioListener || !jazzMusicSound) {
+        return;
+    }
+    
+    const cottageGroup = scene.children.find(child => child.name === 'cottageGroup');
+    if (!cottageGroup) {
+        return;
+    }
+    
+    const distance = elfGroup.position.distanceTo(cottageGroup.position);
+    const proximityRadius = 40;
+    
+    if (distance <= proximityRadius) {
+        resumeAudioContext();
+        if (jazzMusicSound.buffer) {
+            if (!jazzMusicSound.isPlaying) {
+                try {
+                    jazzMusicSound.play();
+                } catch (err) {
+                    console.error('Error playing jazz music:', err);
+                }
+            }
+        }
+    } else {
+        if (jazzMusicSound.buffer && jazzMusicSound.isPlaying) {
+            jazzMusicSound.pause();
+        }
+    }
+}
+
 /**
  * Creates and attaches a looping positional fire crackle sound to the provided fire group.
  *
@@ -2688,6 +2724,7 @@ function makeFireCrackle(fire){
             
             fire.add(posSound1);
         },
+        undefined, // onProgress callback (optional)
         function(error) {
             console.error('Error loading fire crackle sound:', error);
         }
@@ -3743,6 +3780,7 @@ function addJazzToHouse(cottageGroup){
     const jazzMusic = new THREE.PositionalAudio(audioListener);
     const audioLoader = new THREE.AudioLoader();
     
+    jazzMusicSound = jazzMusic;
     jazzMusic.position.set(0, 0, 0);
     
     audioLoader.load(
@@ -3758,23 +3796,13 @@ function addJazzToHouse(cottageGroup){
             cottageGroup.add(jazzMusic);
             console.log('Jazz music loaded successfully');
         },
+        undefined, // onProgress callback (optional)
         function(error) {
             console.warn('Jazz music file not found. Please add christmas-jazz.mp3 to src/sounds/ directory.');
             console.error('Error loading jazz music:', error);
         }
     );
 }
-
-/*
-const groundBounds = {
-    xMin: -100,
-    xMax: 100,
-    zMin: -50,
-    zMax: 50,
-    yMin: -10,
-    yMax: 100
-};
-*/
 
 export async function setupOutdoorScene(){    
     setupLights();
