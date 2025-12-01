@@ -337,10 +337,7 @@ function loadSnowTexture() {
             texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(10, 10);
         },
-        undefined,
-        (error) => {
-            console.error('Error loading snow texture:', error);
-        }
+        undefined
     );
     
     snowTexture.wrapS = THREE.RepeatWrapping;
@@ -348,82 +345,6 @@ function loadSnowTexture() {
     snowTexture.repeat.set(10, 10);
     
     return snowTexture;
-}
-
-
-/**
- * Generates a random position vector for a cloud in the scene sky.
- *
- * - Ensures newly generated position does not overlap closely (within 5 units) with any previously generated cloud positions in the session.
- * - Tries up to 100 times to find a non-overlapping position.
- * - Positions are in world coordinates:
- *   - x: Range from -100 to 100
- *   - y: Range from 50 to 100 (height above ground)
- *   - z: Range from -50 to 50
- * - Records all previous positions statically on the function for future checks.
- *
- * @returns {THREE.Vector3} The generated cloud position in world coordinates.
- */
-function generateCloudPosition() {
-    if (!generateCloudPosition.pastPositions) {
-        generateCloudPosition.pastPositions = [];
-    }
-    let attempt = 0;
-    let cloudPosition;
-    do {
-        cloudPosition = new THREE.Vector3(
-            Math.random() * 200 - 100, // x: -100 to 100
-            Math.random() * 50 + 50,   // y: 50 to 100
-            Math.random() * 100 - 50   // z: -50 to 50
-        );
-
-        var tooClose = generateCloudPosition.pastPositions.some(pos => 
-            pos.distanceTo(cloudPosition) < 5
-        );
-        attempt++;
-    } while (tooClose && attempt < 100);
-
-    generateCloudPosition.pastPositions.push(cloudPosition);
-    
-    return cloudPosition;
-}
-
-
-/**
- * Asynchronously creates a single cloud object and adds it to the scene.
- *
- * This function loads a GLTF model of a cloud from the /models/clouds/scene.gltf
- * directory, clones it for reuse, scales it down for appropriate scene size, and
- * positions it using a randomly generated, non-overlapping sky position.
- * All mesh children within the model have shadows enabled (cast and receive).
- *
- * @async
- * @function
- * @returns {Promise<THREE.Object3D|undefined>} Returns the created cloud object added to the scene,
- * or undefined if model loading fails.
- */
-async function createCloud(){
-    const loader = new GLTFLoader();
-    try {
-        const gltf = await loader.loadAsync('/models/clouds/scene.gltf');
-        const cloud = gltf.scene.clone();
-        
-        cloud.position.copy(generateCloudPosition());
-        
-        cloud.scale.setScalar(0.01);
-        
-        cloud.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
-        
-        scene.add(cloud);
-        return cloud;
-    } catch (error) {
-        console.error('Cant load model:', error);
-    }
 }
 
 /**
@@ -3711,14 +3632,12 @@ function generateWalls(){
 
 function addJazzToHouse(cottageGroup){
     if (!cottageGroup) {
-        console.warn('Cottage group not provided, cannot add jazz music');
         return;
     }
     
     if (!audioListener) {
         audioListener = new THREE.AudioListener();
         camera.add(audioListener);
-        console.log('Audio listener created and added to camera');
     }
     
     const jazzMusic = new THREE.PositionalAudio(audioListener);
@@ -3738,13 +3657,8 @@ function addJazzToHouse(cottageGroup){
             jazzMusic.setVolume(0.4);
             
             cottageGroup.add(jazzMusic);
-            console.log('Jazz music loaded successfully');
         },
-        undefined,
-        function(error) {
-            console.warn('Jazz music file not found. Please add christmas-jazz.mp3 to src/sounds/ directory.');
-            console.error('Error loading jazz music:', error);
-        }
+        undefined
     );
 }
 
