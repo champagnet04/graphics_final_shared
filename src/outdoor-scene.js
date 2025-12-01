@@ -1896,7 +1896,7 @@ function createSnowmanButtons(){
  */
 function createSnowman(x, z) {
     snowmanGroup = new THREE.Group();
-    snowmanGroup.name = 'snowmanGroup'; // Add name for collision detection
+    snowmanGroup.name = 'snowmanGroup';
     snowmanGroup.add(createSnowmanBottom());
     snowmanGroup.add(createSnowmanMiddle());
     snowmanGroup.add(createSnowmanTop());
@@ -2195,7 +2195,7 @@ function createTreeLights(){
  */
 async function createTree(x, z){
     const treeGroup = new THREE.Group();
-    treeGroup.name = 'treeGroup'; // Add name for collision detection
+    treeGroup.name = 'treeGroup';
     treeGroup.add(createTreeTrunk());
     treeGroup.add(createTreeBottom());
     treeGroup.add(createTreeMiddle());
@@ -2617,7 +2617,6 @@ export function checkCampfireProximity() {
         return;
     }
     
-    // Use global elfGroup directly
     if (!elfGroup) {
         return;
     }
@@ -2630,13 +2629,11 @@ export function checkCampfireProximity() {
         return;
     }
     
-    // Use elfGroup position for distance calculation (elf is inside elfGroup)
     const distance = elfGroup.position.distanceTo(campfireGroup.position);
     const proximityRadius = 30;
     
     if (distance <= proximityRadius) {
         resumeAudioContext();
-        // Check if the sound buffer is loaded before trying to play
         if (fireCrackleSound.buffer) {
             if (!fireCrackleSound.isPlaying) {
                 try {
@@ -3026,7 +3023,6 @@ function createSnowballPile() {
  * @returns {boolean} True if a snowball is found in hand, false otherwise.
  */
 export function hasSnowballInHand(){
-    // Ensure elf and elfGroup are available
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
         if (!elf) {
@@ -3041,7 +3037,6 @@ export function hasSnowballInHand(){
         return false;
     }
     
-    // Get the elfGroup (parent of elf, or use global if available)
     if (!elfGroup) {
         elfGroup = elf.parent;
     }
@@ -3049,13 +3044,11 @@ export function hasSnowballInHand(){
         return false;
     }
     
-    // Check in elfGroup first (where it should be when held)
     const snowball = elfGroup.children.find(child => child.name === 'snowballInHand');
     if (snowball) {
         return true;
     }
     
-    // Also check if there's a snowball in the scene (from a previous incomplete throw)
     let foundInScene = false;
     scene.traverse((child) => {
         if (child.name === 'snowballInHand' && child.parent === scene) {
@@ -3085,7 +3078,6 @@ export function hasSnowballInHand(){
  * @function pickUpSnowball
  */
 export function pickUpSnowball(){
-    // Ensure elf is available
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
         if (!elf) {
@@ -3101,7 +3093,6 @@ export function pickUpSnowball(){
         return null;
     }
     
-    // Get the elfGroup (parent of elf, or use global if available)
     if (!elfGroup) {
         elfGroup = elf.parent;
     }
