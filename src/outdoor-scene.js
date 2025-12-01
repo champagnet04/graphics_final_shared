@@ -2692,7 +2692,6 @@ function makeFireCrackle(fire){
     if (!audioListener) {
         audioListener = new THREE.AudioListener();
         camera.add(audioListener);
-        console.log('Audio listener created and added to camera');
     }
     
     const posSound1 = new THREE.PositionalAudio(audioListener);
@@ -2710,7 +2709,7 @@ function makeFireCrackle(fire){
             posSound1.setMaxDistance(50);
             posSound1.setRolloffFactor(8);
             posSound1.setLoop(true);
-            posSound1.setVolume(0.5);
+            posSound1.setVolume(0.8);
             
             fire.add(posSound1);
         },
