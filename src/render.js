@@ -2,24 +2,18 @@ import * as THREE from 'three';
 import { setupOutdoorScene } from './outdoor-scene.js';
 import { moveElf, updateSnow, northernLights, followElf, lookAround, checkCampfireProximity, checkCottageProximity, makeSnowmanSpeak, pickUpSnowball, updateSnowballThrow, throwSnowball, hasSnowballInHand } from './outdoor-scene.js';
 
-// Initialize the scene asynchronously
 async function init() {
     const { scene, camera } = await setupOutdoorScene();
 
-    // Update camera aspect ratio to match window
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
 
-    // Create renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
-
-    // OrbitControls disabled - using 3rd person camera following elf
-    // const controls = new OrbitControls(camera, renderer.domElement);
 
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -48,7 +42,6 @@ async function init() {
                         part.geometry && 
                         part.geometry.type === 'SphereGeometry'
                     )) {
-                        // If snowball is in hand, throw it instead of making snowman speak
                         if (hasSnowballInHand()) {
                             throwSnowball(event.clientX, event.clientY);
                         } else {
@@ -71,23 +64,19 @@ async function init() {
         
         const allIntersects = raycaster.intersectObjects(scene.children, true);
         
-        // Check for snowball pile click first
         if (checkIfSnowballPile(allIntersects)) {
             return;
         }
         
-        // Check for snowman click
         if (checkIfSnowman(allIntersects, event)) {
             return;
         }
         
-        // Otherwise, throw snowball if one exists
         throwSnowball(event.clientX, event.clientY);
     }
     
     renderer.domElement.addEventListener('click', onMouseClick);
 
-    // Update camera aspect ratio when window resizes
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
