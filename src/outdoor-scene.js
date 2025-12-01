@@ -29,7 +29,21 @@ let snowmanGroup = null;
 let campfireGroup = null;
 let cottage = null;
 
-let ballGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+let ballGeometry = new THREE.SphereGeometry(1, 32, 32);
+const snowballGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+const noseGeometry = new THREE.ConeGeometry(0.15, 0.5, 32);
+const bottomHatGeometry = new THREE.CylinderGeometry(1, 1, 0.2, 32);
+const topHatGeometry = new THREE.CylinderGeometry(0.75, 0.75, 1, 32);
+
+const trunkGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
+const treeBottomGeometry = new THREE.CylinderGeometry(1.5, 3, 2.25, 32);
+const treeMiddleGeometry = new THREE.CylinderGeometry(1, 2.25, 2.25, 32);
+const treeTopGeometry = new THREE.ConeGeometry(1.5, 2.25, 32);
+const bottomSnowGeometry = new THREE.CylinderGeometry(2.8, 3.1, 0.5, 32);
+const middleSnowGeometry = new THREE.CylinderGeometry(2.1, 2.35, 0.5, 32);
+const topSnowGeometry = new THREE.CylinderGeometry(1.45, 1.75, 0.5, 32);
+
+
 
 const snowMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -37,8 +51,23 @@ const snowMaterial = new THREE.MeshStandardMaterial({
     map: loadSnowTexture()
 });
 
+const noseMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffa500,
+    side: THREE.DoubleSide
+});
+
+const blackMaterial = new THREE.MeshStandardMaterial({
+    color: 0x000000,
+    side: THREE.DoubleSide
+});
+
 const treeMaterial = new THREE.MeshStandardMaterial({
     color: 0x023020,
+    side: THREE.DoubleSide
+});
+
+const trunkMaterial = new THREE.MeshStandardMaterial({
+    color: 0x654321,
     side: THREE.DoubleSide
 });
 
@@ -53,6 +82,7 @@ const wallMaterial = new THREE.MeshStandardMaterial({
 let sceneObjects = [];
 let audioListener = null;
 let fireCrackleSound = null;
+let jazzMusicSound = null;
 const keysPressed = {};
 let snowballThrowAnimation = null; // { snowball, path, impactT, currentT, speed }
 
@@ -206,32 +236,28 @@ export function followElf(delta) {
  * This function assumes global access to the THREE, scene objects.
  * No parameters; lights are added to the global scene as a side effect.
  */
-function setupLights() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // soft white light
+function setupLights(){
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // bright white light
-    directionalLight.position.set(10, 100, 10); // Position the light
-    directionalLight.castShadow = true; // Enable shadow casting
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    directionalLight.position.set(10, 100, 10);
+    directionalLight.castShadow = true;
     
-    // Configure shadow map for directional light
-    // The shadow camera needs to cover the area where shadows will be cast
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.camera.near = 0.5;
     directionalLight.shadow.camera.far = 500;
-    // Adjust bounds to cover the ground area where clouds cast shadows
     directionalLight.shadow.camera.left = -150;
     directionalLight.shadow.camera.right = 150;
     directionalLight.shadow.camera.top = 150;
     directionalLight.shadow.camera.bottom = -150;
     
-    // Update the shadow camera to look at the scene center
     directionalLight.target.position.set(0, 0, 0);
     directionalLight.target.updateMatrixWorld();
     
     scene.add(directionalLight);
-    scene.add(directionalLight.target); // Add target to scene
+    scene.add(directionalLight.target);
 }
 
 /**
@@ -1579,8 +1605,8 @@ function loadIceTexture() {
  * @returns {THREE.Mesh} The mesh representing the snowman's bottom sphere.
  */
 function createSnowmanBottom() {
-    const snowmanGeometry = new THREE.SphereGeometry(2, 32, 32);
-    const snowmanBottom = new THREE.Mesh(snowmanGeometry, snowMaterial);
+    const snowmanBottom = new THREE.Mesh(ballGeometry, snowMaterial);
+    snowmanBottom.scale.setScalar(2);
     snowmanBottom.position.set(0, 1, 0);
     snowmanBottom.castShadow = true;
     snowmanBottom.receiveShadow = true;
@@ -1598,9 +1624,9 @@ function createSnowmanBottom() {
  *
  * @returns {THREE.Mesh} The mesh representing the snowman's middle sphere.
  */
-function createSnowmanMiddle() {
-    const snowmanGeometry = new THREE.SphereGeometry(1.5, 32, 32);
-    const snowmanMiddle = new THREE.Mesh(snowmanGeometry, snowMaterial);
+function createSnowmanMiddle(){
+    const snowmanMiddle = new THREE.Mesh(ballGeometry, snowMaterial);
+    snowmanMiddle.scale.setScalar(1.5);
     snowmanMiddle.position.set(0, 3, 0);
     snowmanMiddle.castShadow = true;
     snowmanMiddle.receiveShadow = true;
@@ -1619,9 +1645,8 @@ function createSnowmanMiddle() {
  *
  * @returns {THREE.Mesh} The mesh representing the snowman's top sphere.
  */
-function createSnowmanTop() {
-    const snowmanGeometry = new THREE.SphereGeometry(1, 32, 32);
-    const snowmanTop = new THREE.Mesh(snowmanGeometry, snowMaterial);
+function createSnowmanTop(){
+    const snowmanTop = new THREE.Mesh(ballGeometry, snowMaterial);
     snowmanTop.position.set(0, 5, 0);
     snowmanTop.castShadow = true;
     snowmanTop.receiveShadow = true;
@@ -1660,13 +1685,8 @@ function createSnowmanHat() {
  *
  * @returns {THREE.Mesh} The mesh representing the bottom of the snowman's hat.
  */
-function createSnowmanHatBottom() {
-    const hatGeometry = new THREE.CylinderGeometry(1, 1, 0.2, 32);
-    const hatMaterial = new THREE.MeshStandardMaterial({
-        color: 0x000000,
-        side: THREE.DoubleSide
-    });
-    const snowmanHatBottom = new THREE.Mesh(hatGeometry, hatMaterial);
+function createSnowmanHatBottom(){
+    const snowmanHatBottom = new THREE.Mesh(bottomHatGeometry, blackMaterial);
     snowmanHatBottom.position.set(0, 6, 0);
     snowmanHatBottom.castShadow = true;
     snowmanHatBottom.receiveShadow = true;
@@ -1685,13 +1705,8 @@ function createSnowmanHatBottom() {
  *
  * @returns {THREE.Mesh} The mesh representing the top cylinder of the snowman's hat.
  */
-function createSnowmanHatTop() {
-    const hatGeometry = new THREE.CylinderGeometry(0.75, 0.75, 1, 32);
-    const hatMaterial = new THREE.MeshStandardMaterial({
-        color: 0x000000,
-        side: THREE.DoubleSide
-    });
-    const snowmanHatTop = new THREE.Mesh(hatGeometry, hatMaterial);
+function createSnowmanHatTop(){
+    const snowmanHatTop = new THREE.Mesh(topHatGeometry, blackMaterial);
     snowmanHatTop.position.set(0, 6.5, 0);
     snowmanHatTop.castShadow = true;
     snowmanHatTop.receiveShadow = true;
@@ -1699,23 +1714,22 @@ function createSnowmanHatTop() {
 }
 
 /**
- * Creates a single piece of coal for use in a snowman face (eyes, mouth, etc.).
+ * Creates a single piece of coal for use in a snowman face (eyes, mouth, buttons, etc.).
  *
- * This function constructs a small black sphere mesh using THREE.SphereGeometry
- * and MeshStandardMaterial. The sphere is sized to resemble a piece of coal,
- * with a radius of 0.1 units, and is set to both cast and receive shadows
+ * This function constructs a black sphere mesh by reusing the global `ballGeometry`
+ * (which has radius 1) and scaling it to the desired size. The sphere uses
+ * MeshStandardMaterial with black color and is set to both cast and receive shadows
  * for realistic appearance in the scene. The mesh is suitable for use as
- * snowman facial features such as eyes or smile components.
+ * snowman facial features such as eyes, smile components, or buttons.
  *
+ * @param {number} [scale=0.1] - The scale factor to apply to the ballGeometry. 
+ *                                Defaults to 0.1, which results in a radius of 0.1 units.
+ *                                For example, use 0.15 for buttons that should be 1.5x larger than eyes.
  * @returns {THREE.Mesh} The mesh representing a single coal piece.
  */
-function createCoalPiece() {
-    const coalGeometry = new THREE.SphereGeometry(0.1, 32, 32);
-    const coalMaterial = new THREE.MeshStandardMaterial({
-        color: 0x000000,
-        side: THREE.DoubleSide
-    });
-    const coalPiece = new THREE.Mesh(coalGeometry, coalMaterial);
+function createCoalPiece(scale = 0.1){
+    const coalPiece = new THREE.Mesh(ballGeometry, blackMaterial);
+    coalPiece.scale.setScalar(scale);
     coalPiece.castShadow = true;
     coalPiece.receiveShadow = true;
     return coalPiece;
@@ -1752,12 +1766,7 @@ function createSnowmanEyes() {
  *
  * @returns {THREE.Mesh} The mesh representing the snowman's carrot nose.
  */
-function createSnowmanNose() {
-    const noseGeometry = new THREE.ConeGeometry(0.15, 0.5, 32);
-    const noseMaterial = new THREE.MeshStandardMaterial({
-        color: 0xffa500,
-        side: THREE.DoubleSide
-    });
+function createSnowmanNose(){
     const snowmanNose = new THREE.Mesh(noseGeometry, noseMaterial);
     snowmanNose.position.set(0, 5, 1.25);
     snowmanNose.rotation.x = Math.PI / 2;
@@ -1837,12 +1846,9 @@ function createSnowmanFace() {
  */
 function createSnowmanButtons() {
     const buttonsGroup = new THREE.Group();
-    const button1 = createCoalPiece();
-    const button2 = createCoalPiece();
-    const button3 = createCoalPiece();
-    button1.scale.set(1.5, 1.5, 1.5);
-    button2.scale.set(1.5, 1.5, 1.5);
-    button3.scale.set(1.5, 1.5, 1.5);
+    const button1 = createCoalPiece(0.15);
+    const button2 = createCoalPiece(0.15);
+    const button3 = createCoalPiece(0.15);
     button1.position.set(0, 3.85, 1.25);
     button2.position.set(0, 3, 1.5);
     button3.position.set(0, 1.75, 1.85);
@@ -1865,7 +1871,7 @@ function createSnowmanButtons() {
  */
 function createSnowman(x, z) {
     snowmanGroup = new THREE.Group();
-    snowmanGroup.name = 'snowmanGroup'; // Add name for collision detection
+    snowmanGroup.name = 'snowmanGroup';
     snowmanGroup.add(createSnowmanBottom());
     snowmanGroup.add(createSnowmanMiddle());
     snowmanGroup.add(createSnowmanTop());
@@ -1886,12 +1892,7 @@ function createSnowman(x, z) {
  *
  * @returns {THREE.Mesh} The mesh representing the tree trunk.
  */
-function createTreeTrunk() {
-    const trunkGeometry = new THREE.CylinderGeometry(1, 1, 2, 32);
-    const trunkMaterial = new THREE.MeshStandardMaterial({
-        color: 0x654321,
-        side: THREE.DoubleSide
-    });
+function createTreeTrunk(){
     const trunkMesh = new THREE.Mesh(trunkGeometry, trunkMaterial);
     trunkMesh.position.set(0, 0.5, 0);
     trunkMesh.castShadow = true;
@@ -1908,9 +1909,8 @@ function createTreeTrunk() {
  *
  * @returns {THREE.Mesh} The mesh representing the bottom foliage section of the pine tree.
  */
-function createTreeBottom() {
-    const bottomGeom = new THREE.CylinderGeometry(1.5, 3, 2.25, 32);
-    const bottomMesh = new THREE.Mesh(bottomGeom, treeMaterial);
+function createTreeBottom(){
+    const bottomMesh = new THREE.Mesh(treeBottomGeometry, treeMaterial);
     bottomMesh.position.set(0, 2, 0);
     bottomMesh.castShadow = true;
     bottomMesh.receiveShadow = true;
@@ -1926,9 +1926,8 @@ function createTreeBottom() {
  *
  * @returns {THREE.Mesh} The mesh representing the middle foliage section of the pine tree.
  */
-function createTreeMiddle() {
-    const middleGeom = new THREE.CylinderGeometry(1, 2.25, 2.25, 32);
-    const middleMesh = new THREE.Mesh(middleGeom, treeMaterial);
+function createTreeMiddle(){
+    const middleMesh = new THREE.Mesh(treeMiddleGeometry, treeMaterial);
     middleMesh.position.set(0, 4.25, 0);
     middleMesh.castShadow = true;
     middleMesh.receiveShadow = true;
@@ -1944,9 +1943,8 @@ function createTreeMiddle() {
  *
  * @returns {THREE.Mesh} The mesh representing the top foliage section of the pine tree.
  */
-function createTreeTop() {
-    const topGeom = new THREE.ConeGeometry(1.5, 2.25, 32);
-    const topMesh = new THREE.Mesh(topGeom, treeMaterial);
+function createTreeTop(){
+    const topMesh = new THREE.Mesh(treeTopGeometry, treeMaterial);
     topMesh.position.set(0, 6.5, 0);
     topMesh.castShadow = true;
     topMesh.receiveShadow = true;
@@ -1964,9 +1962,8 @@ function createTreeTop() {
  *
  * @returns {THREE.Mesh} The mesh representing the bottom snow layer of the tree.
  */
-function createBottomTreeSnow() {
-    const bottomSnowGeom = new THREE.CylinderGeometry(2.8, 3.1, 0.5, 32);
-    const bottomSnowMesh = new THREE.Mesh(bottomSnowGeom, snowMaterial);
+function createBottomTreeSnow(){
+    const bottomSnowMesh = new THREE.Mesh(bottomSnowGeometry, snowMaterial);
     bottomSnowMesh.position.set(0, 1, 0);
     bottomSnowMesh.castShadow = true;
     bottomSnowMesh.receiveShadow = true;
@@ -1984,9 +1981,8 @@ function createBottomTreeSnow() {
  *
  * @returns {THREE.Mesh} The mesh representing the middle snow layer of the tree.
  */
-function createMiddleTreeSnow() {
-    const middleSnowGeom = new THREE.CylinderGeometry(2.1, 2.35, 0.5, 32);
-    const middleSnowMesh = new THREE.Mesh(middleSnowGeom, snowMaterial);
+function createMiddleTreeSnow(){
+    const middleSnowMesh = new THREE.Mesh(middleSnowGeometry, snowMaterial);
     middleSnowMesh.position.set(0, 3.25, 0);
     middleSnowMesh.castShadow = true;
     middleSnowMesh.receiveShadow = true;
@@ -2004,9 +2000,8 @@ function createMiddleTreeSnow() {
  *
  * @returns {THREE.Mesh} The mesh representing the top snow layer of the tree.
  */
-function createTopTreeSnow() {
-    const topSnowGeom = new THREE.CylinderGeometry(1.45, 1.75, 0.5, 32);
-    const topSnowMesh = new THREE.Mesh(topSnowGeom, snowMaterial);
+function createTopTreeSnow(){
+    const topSnowMesh = new THREE.Mesh(topSnowGeometry, snowMaterial);
     topSnowMesh.position.set(0, 5.25, 0);
     topSnowMesh.castShadow = true;
     topSnowMesh.receiveShadow = true;
@@ -2175,7 +2170,7 @@ function createTreeLights() {
  */
 async function createTree(x, z) {
     const treeGroup = new THREE.Group();
-    treeGroup.name = 'treeGroup'; // Add name for collision detection
+    treeGroup.name = 'treeGroup';
     treeGroup.add(createTreeTrunk());
     treeGroup.add(createTreeBottom());
     treeGroup.add(createTreeMiddle());
@@ -2588,7 +2583,6 @@ export function checkCampfireProximity() {
         return;
     }
     
-    // Use global elfGroup directly
     if (!elfGroup) {
         return;
     }
@@ -2601,13 +2595,11 @@ export function checkCampfireProximity() {
         return;
     }
     
-    // Use elfGroup position for distance calculation (elf is inside elfGroup)
     const distance = elfGroup.position.distanceTo(campfireGroup.position);
     const proximityRadius = 30;
     
     if (distance <= proximityRadius) {
         resumeAudioContext();
-        // Check if the sound buffer is loaded before trying to play
         if (fireCrackleSound.buffer) {
             if (!fireCrackleSound.isPlaying) {
                 try {
@@ -2620,6 +2612,41 @@ export function checkCampfireProximity() {
     } else {
         if (fireCrackleSound.buffer && fireCrackleSound.isPlaying) {
             fireCrackleSound.pause();
+        }
+    }
+}
+
+export function checkCottageProximity() {
+    if (!elf || !elfGroup) {
+        return;
+    }
+    
+    if (!audioListener || !jazzMusicSound) {
+        return;
+    }
+    
+    const cottageGroup = scene.children.find(child => child.name === 'cottageGroup');
+    if (!cottageGroup) {
+        return;
+    }
+    
+    const distance = elfGroup.position.distanceTo(cottageGroup.position);
+    const proximityRadius = 40;
+    
+    if (distance <= proximityRadius) {
+        resumeAudioContext();
+        if (jazzMusicSound.buffer) {
+            if (!jazzMusicSound.isPlaying) {
+                try {
+                    jazzMusicSound.play();
+                } catch (err) {
+                    console.error('Error playing jazz music:', err);
+                }
+            }
+        }
+    } else {
+        if (jazzMusicSound.buffer && jazzMusicSound.isPlaying) {
+            jazzMusicSound.pause();
         }
     }
 }
@@ -2667,6 +2694,7 @@ function makeFireCrackle(fire) {
             
             fire.add(posSound1);
         },
+        undefined, // onProgress callback (optional)
         function(error) {
             console.error('Error loading fire crackle sound:', error);
         }
@@ -2928,7 +2956,7 @@ export function makeSnowmanSpeak() {
  * @returns {THREE.Mesh} The snowball mesh with morph target.
  */
 function createSnowball(){
-    const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+    const geometry = snowballGeometry.clone();
     
     const positionAttribute = geometry.attributes.position;
     const morphPositions = [];
@@ -3002,7 +3030,6 @@ function createSnowballPile() {
  * @returns {boolean} True if a snowball is found in hand, false otherwise.
  */
 export function hasSnowballInHand(){
-    // Ensure elf and elfGroup are available
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
         if (!elf) {
@@ -3017,7 +3044,6 @@ export function hasSnowballInHand(){
         return false;
     }
     
-    // Get the elfGroup (parent of elf, or use global if available)
     if (!elfGroup) {
         elfGroup = elf.parent;
     }
@@ -3025,13 +3051,11 @@ export function hasSnowballInHand(){
         return false;
     }
     
-    // Check in elfGroup first (where it should be when held)
     const snowball = elfGroup.children.find(child => child.name === 'snowballInHand');
     if (snowball) {
         return true;
     }
     
-    // Also check if there's a snowball in the scene (from a previous incomplete throw)
     let foundInScene = false;
     scene.traverse((child) => {
         if (child.name === 'snowballInHand' && child.parent === scene) {
@@ -3061,7 +3085,6 @@ export function hasSnowballInHand(){
  * @function pickUpSnowball
  */
 export function pickUpSnowball(){
-    // Ensure elf is available
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
         if (!elf) {
@@ -3077,7 +3100,6 @@ export function pickUpSnowball(){
         return null;
     }
     
-    // Get the elfGroup (parent of elf, or use global if available)
     if (!elfGroup) {
         elfGroup = elf.parent;
     }
@@ -3320,16 +3342,12 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
     const snowballRadius = 0.3;
     const raycaster = new THREE.Raycaster();
     
-    // Set camera on raycaster to avoid sprite raycasting errors
     raycaster.camera = camera;
     
-    // Get all 3D objects from sceneObjects
     const objectsToCheck = sceneObjects.filter(obj => obj instanceof THREE.Object3D);
     
-    // Also search the scene for collision objects (trees, snowmen, cottage, etc.)
     scene.traverse((child) => {
         if (child instanceof THREE.Group) {
-            // Check for known collision objects
             if (child.name === 'cottageGroup' || 
                 child.name === 'snowmanGroup' || 
                 (child.name && child.name.startsWith('treeGroup')) ||
@@ -3341,15 +3359,6 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
             }
         }
     });
-    
-    // Debug: log how many objects we're checking
-    if (objectsToCheck.length > 0) {
-        const treeCount = objectsToCheck.filter(obj => obj.name && obj.name.startsWith('treeGroup')).length;
-        // Only log occasionally to avoid spam
-        if (Math.random() < 0.01) {
-            console.log(`Checking collision against ${objectsToCheck.length} objects (${treeCount} trees)`);
-        }
-    }
     
     if (ground) {
         objectsToCheck.push(ground);
@@ -3370,10 +3379,8 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
     try {
         intersects = raycaster.intersectObjects(objectsToCheck, true);
     } catch (error) {
-        // If error, check objects individually and skip sprites
         for (const obj of objectsToCheck) {
             try {
-                // Skip sprites to avoid camera requirement
                 if (obj.type === 'Sprite') {
                     continue;
                 }
@@ -3389,7 +3396,6 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
         intersects.sort((a, b) => a.distance - b.distance);
         const closestHit = intersects[0];
         
-        // Debug logging
         if (closestHit.object && closestHit.object.name && closestHit.object.name.includes('tree')) {
             console.log('Tree intersection found:', {
                 distance: closestHit.distance,
@@ -3400,11 +3406,9 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
             });
         }
         
-        // Check if hit is within the movement distance (allow hits at any distance along the path)
         if (closestHit.distance >= 0 && closestHit.distance <= distance + snowballRadius) {
-            // Offset the hit point back along the direction to place snowball on surface
             const hitPoint = closestHit.point.clone();
-            const offsetDirection = direction.clone().negate(); // Move back from the hit
+            const offsetDirection = direction.clone().negate();
             hitPoint.add(offsetDirection.multiplyScalar(snowballRadius));
             return { point: hitPoint };
         }
@@ -3426,18 +3430,15 @@ function morphSnowballIntoSplat() {
     
     const { snowball } = snowballThrowAnimation;
     
-    // Store reference to snowball in case animation state is cleared
     if (!snowball) {
         return;
     }
     
-    // The morph target should already exist from createSnowball()
     if (!snowball.morphTargetInfluences || snowball.morphTargetInfluences.length === 0) {
         console.warn('Snowball has no morph targets');
         return;
     }
     
-    // Verify morph attributes exist
     if (!snowball.geometry || !snowball.geometry.morphAttributes || !snowball.geometry.morphAttributes.position) {
         console.warn('Snowball geometry has no morph attributes');
         return;
@@ -3445,15 +3446,12 @@ function morphSnowballIntoSplat() {
     
     console.log('Starting snowball morph animation');
     
-    // Play splat sound when morph starts
     makeSplatSound();
     
-    // Animate the morph
     const morphStartTime = Date.now();
     const morphDuration = 150;
     
     function animateMorph() {
-        // Check if snowball still exists
         if (!snowball || !snowball.parent) {
             console.warn('Snowball removed during morph animation');
             return;
@@ -3462,14 +3460,12 @@ function morphSnowballIntoSplat() {
         const elapsed = Date.now() - morphStartTime;
         const progress = Math.min(elapsed / morphDuration, 1);
         
-        // Ease-out curve
         const eased = 1 - Math.pow(1 - progress, 3);
         snowball.morphTargetInfluences[0] = eased;
         
         if (progress < 1) {
             requestAnimationFrame(animateMorph);
         } else {
-            // Fade out after morph completes
             setTimeout(() => {
                 fadeOutSplat(snowball);
             }, 2000);
@@ -3579,58 +3575,44 @@ function loadWallTexture(){
 }
 
 function createWall(wallCorners, wallName) {
-    // wallCorners is an array of 2 Vector3 points at ground level (y=0)
     const corner1 = wallCorners[0];
     const corner2 = wallCorners[1];
     
-    // Calculate the width of the wall (distance between the two corners)
     const wallWidth = corner1.distanceTo(corner2);
     
-    // Set wall height (half of the max height from groundBounds)
     const wallHeight = 25;
     
-    // Create the wall geometry
     const wallGeometry = new THREE.PlaneGeometry(wallWidth, wallHeight);
     const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
     
-    // Set the wall name for identification
     if (wallName) {
         wallMesh.name = wallName;
     }
     
-    // Calculate the midpoint between the two corners
     const midpoint = new THREE.Vector3();
     midpoint.addVectors(corner1, corner2);
     midpoint.multiplyScalar(0.5);
     
-    // Position the wall at the midpoint, with the bottom at ground level
     wallMesh.position.set(midpoint.x, wallHeight / 2 - 5, midpoint.z);
     
-    // Calculate the direction vector along the wall (from corner1 to corner2)
     const wallDirection = new THREE.Vector3();
     wallDirection.subVectors(corner2, corner1);
     wallDirection.normalize();
     
-    // Calculate the outward direction (from scene center to midpoint)
     const outwardDirection = new THREE.Vector3();
     outwardDirection.copy(midpoint);
     outwardDirection.normalize();
     
-    // Calculate the normal to the wall (perpendicular to wallDirection, pointing outward)
-    // The wall should be perpendicular to the line between corners and face outward
     const wallNormal = new THREE.Vector3();
     wallNormal.crossVectors(wallDirection, new THREE.Vector3(0, 1, 0));
     
-    // Determine which direction is outward by checking the dot product with outwardDirection
     if (wallNormal.dot(outwardDirection) < 0) {
         wallNormal.negate();
     }
     
-    // Calculate rotation angle to face the wall outward
     const angle = Math.atan2(wallNormal.x, wallNormal.z);
     wallMesh.rotation.y = angle;
     
-    // Set shadow properties
     wallMesh.castShadow = true;
     wallMesh.receiveShadow = true;
     
@@ -3660,7 +3642,6 @@ function determineFrontWallBounds(){
     frontWallCorners.push(frontLeftCorner);
     frontWallCorners.push(frontRightCorner);
     return frontWallCorners;
-    //all are gonna have the same height, so do that in later function?
 }
 
 function determineBackWallBounds(){
@@ -3671,7 +3652,6 @@ function determineBackWallBounds(){
     backWallCorners.push(backLeftCorner);
     backWallCorners.push(backRightCorner);
     return backWallCorners;
-    //all are gonna have the same height, so do that in later function?
 }
 
 function determineLeftWallBounds(){
@@ -3682,7 +3662,6 @@ function determineLeftWallBounds(){
     leftWallCorners.push(leftFrontCorner);
     leftWallCorners.push(leftBackCorner);
     return leftWallCorners;
-    //all are gonna have the same height, so do that in later function?
 }
 
 function determineRightWallBounds(){
@@ -3693,7 +3672,6 @@ function determineRightWallBounds(){
     rightWallCorners.push(rightFrontCorner);
     rightWallCorners.push(rightBackCorner);
     return rightWallCorners;
-    //all are gonna have the same height, so do that in later function?
 }
 
 function generateWalls(){
@@ -3706,109 +3684,56 @@ function generateWalls(){
     scene.add(leftWall);
     scene.add(rightWall);
     
-    // Add walls to sceneObjects for collision detection
     sceneObjects.push(frontWall);
     sceneObjects.push(backWall);
     sceneObjects.push(leftWall);
     sceneObjects.push(rightWall);
 }
 
-/*
-const groundBounds = {
-    xMin: -100,
-    xMax: 100,
-    zMin: -50,
-    zMax: 50,
-    yMin: -10,
-    yMax: 100
-};
-*/
-
-/**
- * Creates, configures, loads, and starts a looping THREE.PositionalAudio sound 
- * and attaches it to a specified object.
- * * This is the function that makes the music louder/quieter based on distance.
- */
-function addPositionalMusic(url, object, refDistance, maxDistance) {
-    if (!audioListener) {
-        console.error('AudioListener not initialized.');
+function addJazzToHouse(cottageGroup){
+    if (!cottageGroup) {
+        console.warn('Cottage group not provided, cannot add jazz music');
         return;
     }
-
-    const sound = new THREE.PositionalAudio(audioListener);
+    
+    if (!audioListener) {
+        audioListener = new THREE.AudioListener();
+        camera.add(audioListener);
+        console.log('Audio listener created and added to camera');
+    }
+    
+    const jazzMusic = new THREE.PositionalAudio(audioListener);
     const audioLoader = new THREE.AudioLoader();
-
-    audioLoader.load(url, function (buffer) {
-        sound.setBuffer(buffer);
-        sound.setLoop(true);
-        sound.setVolume(0.7); 
-        // 🎧 KEY SETTINGS: Volume is maximum at 5 units.
-        sound.setRefDistance(refDistance); 
-        // Volume is minimum at 40 units and beyond.
-        sound.setMaxDistance(maxDistance); 
-        sound.setRolloffFactor(1); 
-        sound.play();
-    }, undefined, function (error) {
-        console.error('Error loading audio:', url, error);
-    });
-
-    object.add(sound);
-    return sound;
-}
-
-/**
- * Starts all scene sounds (campfire, cottage music) after the Audio Context is resumed.
- */
-function startAllSceneSounds() {
-    // A. Start the Campfire Crackle Sound (optional, based on your other code)
-    if (campfireGroup && fireCrackleSound === null) {
-        // Assume makeFireCrackle is defined elsewhere in your file
-        // makeFireCrackle(campfireGroup); 
-    }
-
-    // B. Start the Cottage Music
-    if (cottage && !cottage.getObjectByName('christmasMusic')) { 
-        // ⚠️ Ensure this path is correct: 'christmas-jazz.mp3' is the file you uploaded.
-        const musicUrl = '/sounds/christmas-jazz.mp3'; 
-        const sound = addPositionalMusic(musicUrl, cottage, 5, 40);
-        if (sound) {
-            sound.name = 'christmasMusic'; 
-            console.log('Christmas music started on cottage.');
+    
+    jazzMusicSound = jazzMusic;
+    jazzMusic.position.set(0, 0, 0);
+    
+    audioLoader.load(
+        '/sounds/christmas-jazz.mp3',
+        function(buffer) {
+            jazzMusic.setBuffer(buffer);
+            jazzMusic.setRefDistance(5);
+            jazzMusic.setMaxDistance(40);
+            jazzMusic.setRolloffFactor(8);
+            jazzMusic.setLoop(true);
+            jazzMusic.setVolume(0.4);
+            
+            cottageGroup.add(jazzMusic);
+            console.log('Jazz music loaded successfully');
+        },
+        undefined,
+        function(error) {
+            console.warn('Jazz music file not found. Please add christmas-jazz.mp3 to src/sounds/ directory.');
+            console.error('Error loading jazz music:', error);
         }
-    }
+    );
 }
 
-/**
- * Initializes the Audio Listener and starts the Audio Context upon user interaction.
- * This should be the function called by the 'click' and 'keydown' event listeners.
- */
-export function startAudio() { 
-    if (!audioListener) { 
-        audioListener = new THREE.AudioListener(); 
-        camera.add(audioListener); 
-    } 
-    
-    // 2. Resume Context (required by modern browsers)
-    if (audioListener.context.state === 'suspended') { 
-        audioListener.context.resume().then(() => { 
-            console.log('Audio Context resumed successfully.'); 
-            startAllSceneSounds(); 
-        });
-    } else { 
-        startAllSceneSounds(); 
-    } 
-    
-    // 3. Remove listeners so audio only starts once
-    document.removeEventListener('click', startAudio); 
-    document.removeEventListener('keydown', startAudio); 
-}
-
-export async function setupOutdoorScene() {    
+export async function setupOutdoorScene(){    
     setupLights();
     createGround();
     await generateElfAtOrigin();
-
-    cottage = await generateCottage();
+    const cottageGroup = await generateCottage();
     addChristmasLightsToCottage();
 
     generateSnow();
@@ -3822,7 +3747,7 @@ export async function setupOutdoorScene() {
     createSnowballPile();
     generateWalls();
     await addCandyToPath(createPath());
-    console.log('Scene setup complete');
+    addJazzToHouse(cottageGroup);
     return { scene, camera };
 }
 
