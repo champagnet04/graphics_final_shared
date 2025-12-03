@@ -76,7 +76,7 @@ const wallMaterial = new THREE.MeshStandardMaterial({
     side: THREE.DoubleSide,
     map: loadWallTexture(),
     transparent: true,
-    opacity: 0.7
+    alphaTest: 0.5
 });
 
 let sceneObjects = [];
@@ -309,19 +309,19 @@ function modifyTerrainHeights(geometry) {
  *   - Updates the global `ground` variable.
  *   - Adds the ground to the global scene.
  */
-function createGround() {
+function createGround(){
     // TO DO: make the ground smoother (get rid of the lines and make it smooth)
     const groundGeometry = new THREE.PlaneGeometry(200, 100, 50, 25);
     
     modifyTerrainHeights(groundGeometry);
 
     ground = new THREE.Mesh(groundGeometry, snowMaterial);
-    ground.name = 'ground'; // Add name for identification
+    ground.name = 'ground';
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
     ground.castShadow = true;
     ground.receiveShadow = true;
-    ground.visible = true; // Ensure it's visible
+    ground.visible = true;
     scene.add(ground);
 }
 
@@ -507,7 +507,6 @@ async function generateElfAtOrigin() {
 function checkGroundBounds(x, z) {
     const collisionRadius = 0.5;
     
-    // Check if position (accounting for collision radius) is within ground bounds
     if (x - collisionRadius < groundBounds.xMin || x + collisionRadius > groundBounds.xMax) {
         return false;
     }
@@ -636,16 +635,62 @@ export function moveElf(delta) {
         return;
     }
 
-    // 1. Normalize and scale the movement vector
-    const moveVector = direction.clone().normalize().multiplyScalar(movementSpeed * delta);
+    const moveSpeed = 0.3;
     
-    // 2. Apply the movement relative to the elf's current orientation
-    // translateX: Strafe Left/Right (ArrowLeft/ArrowRight)
-    // translateZ: Forward/Backward (ArrowUp/ArrowDown)
-    elfGroup.translateX(moveVector.x); 
-    elfGroup.translateZ(moveVector.z); 
+    const currentX = elfGroup.position.x;
+    const currentZ = elfGroup.position.z;
     
-    // 3. Update height
+    const elfRotation = elfGroup.rotation.y;
+    
+    const forward = new THREE.Vector3(
+        Math.sin(elfRotation),
+        0,
+        Math.cos(elfRotation)
+    );
+    
+    const right = new THREE.Vector3(
+        Math.sin(elfRotation + Math.PI / 2),
+        0,
+        Math.cos(elfRotation + Math.PI / 2)
+    );
+    
+    let newX = currentX;
+    let newZ = currentZ;
+    
+    if (keysPressed['arrowup']) {
+        newX = currentX + forward.x * moveSpeed;
+        newZ = currentZ + forward.z * moveSpeed;
+    } else if (keysPressed['arrowdown']) {
+        newX = currentX - forward.x * moveSpeed;
+        newZ = currentZ - forward.z * moveSpeed;
+    } else if (keysPressed['arrowleft']) {
+        newX = currentX + right.x * moveSpeed;
+        newZ = currentZ + right.z * moveSpeed;
+    } else if (keysPressed['arrowright']) {
+        newX = currentX - right.x * moveSpeed;
+        newZ = currentZ - right.z * moveSpeed;
+    }
+    
+    try {
+        // First check if the new position is within ground bounds
+        if (!checkGroundBounds(newX, newZ)) {
+            return; // Don't move if outside ground bounds
+        }
+        
+        // Then check for collisions with scene objects
+        if (!checkElfCollision(newX, newZ)) {
+            elfGroup.position.x = newX;
+            elfGroup.position.z = newZ;
+        }
+    } catch (error) {
+        console.error('Collision check error in moveElf:', error);
+        // Only update position if within bounds even on error
+        if (checkGroundBounds(newX, newZ)) {
+            elfGroup.position.x = newX;
+            elfGroup.position.z = newZ;
+        }
+    }
+    
     elfGroup.position.y = getHeightAt(elfGroup.position.x, elfGroup.position.z);
 }
 
@@ -1859,6 +1904,105 @@ function createSnowmanButtons() {
 }
 
 /**
+ * Generates a texture with the specified text rendered onto an HTML Canvas.
+ * This texture is then used by a THREE.Sprite.
+ * * @param {string} text - The text to display.
+ * @returns {THREE.CanvasTexture} The texture containing the rendered text.
+ */
+function createLabelTexture(text) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const font = '40px Tampico Rough';
+    context.font = font;
+
+    // 1. Measure text to determine canvas size
+    const metrics = context.measureText(text);
+    const textWidth = metrics.width;
+    const textHeight = 40;
+
+    // 2. Set canvas size with padding
+    canvas.width = textWidth + 20; 
+    canvas.height = textHeight + 20;
+
+    // 3. Redraw (need to set font again after resizing canvas)
+    context.font = font;
+    // Optional: Draw a subtle background for better visibility
+    context.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Semi-transparent white
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 4. Draw the text
+    context.fillStyle = 'rgba(89, 19, 19, 0.7)';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+}
+
+/**
+ * Creates a THREE.Sprite for the "Click me!" label, positioned above the snowman.
+ * * @returns {THREE.Sprite} The sprite object containing the text label.
+ */
+function createSnowmanLabel() {
+    const text = "Click me!";
+    const texture = createLabelTexture(text);
+
+    const spriteMaterial = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 1.0,
+        depthTest: true // Ensure it doesn't render through closer objects
+    });
+
+    const sprite = new THREE.Sprite(spriteMaterial);
+    
+    // Set a consistent width for the sprite and calculate height based on texture aspect ratio
+    const spriteWidth = 4; // Arbitrary size, adjust as needed
+    const spriteHeight = (spriteWidth * texture.image.height) / texture.image.width;
+
+    sprite.scale.set(spriteWidth, spriteHeight, 1);
+    
+    // Position 7.5 units up (above the hat, which is at y=6.5 relative to the group)
+    sprite.position.set(0, 7.5, 0); 
+    sprite.name = 'snowmanLabel';
+
+    return sprite;
+}
+
+/**
+ * Creates a THREE.Sprite for the "Click me!" label, positioned above the snowball pile.
+ * @returns {THREE.Sprite} The sprite object containing the text label.
+ */
+function createSnowballLabel() {
+    // Reusing the same text and texture generation logic
+    const text = "Click me!";
+    const texture = createLabelTexture(text);
+
+    const spriteMaterial = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 1.0,
+        depthTest: true // Important for visibility
+    });
+
+    const sprite = new THREE.Sprite(spriteMaterial);
+    
+    // Use the same scale for consistent look (e.g., 4 units wide)
+    const spriteWidth = 4;
+    const spriteHeight = (spriteWidth * texture.image.height) / texture.image.width;
+
+    sprite.scale.set(spriteWidth, spriteHeight, 1);
+    
+    // Position it slightly above the pile (1.5 units up from the ground)
+    sprite.position.set(0, 1.5, 0); 
+    sprite.name = 'snowballLabel';
+
+    return sprite;
+}
+
+/**
  * Creates and adds a snowman to the scene at the specified (x, z) coordinates.
  *
  * This function constructs a snowman using helper functions for each part: bottom,
@@ -1878,6 +2022,7 @@ function createSnowman(x, z) {
     snowmanGroup.add(createSnowmanHat());
     snowmanGroup.add(createSnowmanFace());
     snowmanGroup.add(createSnowmanButtons());
+    snowmanGroup.add(createSnowmanLabel());
     snowmanGroup.position.set(x, getHeightAt(x, z), z);
     scene.add(snowmanGroup);
     return snowmanGroup;
@@ -2672,7 +2817,6 @@ function makeFireCrackle(fire) {
     if (!audioListener) {
         audioListener = new THREE.AudioListener();
         camera.add(audioListener);
-        console.log('Audio listener created and added to camera');
     }
     
     const posSound1 = new THREE.PositionalAudio(audioListener);
@@ -2690,7 +2834,7 @@ function makeFireCrackle(fire) {
             posSound1.setMaxDistance(50);
             posSound1.setRolloffFactor(8);
             posSound1.setLoop(true);
-            posSound1.setVolume(0.5);
+            posSound1.setVolume(0.8);
             
             fire.add(posSound1);
         },
@@ -3019,6 +3163,7 @@ function createSnowballPile() {
         snowball.position.set(localX, localY, localZ);
         snowballPile.add(snowball);
     }
+    snowballPile.add(createSnowballLabel());
     
     sceneObjects.push(snowballPile);
     scene.add(snowballPile);
@@ -3552,10 +3697,10 @@ function makeSplatSound() {
     );
 }
 
-function loadWallTexture(){
+function loadWallTexture() {
     const loader = new THREE.TextureLoader();
     const wallTexture = loader.load(
-        '/textures/mountains.webp',
+        '/textures/mountains.png',
         (texture) => {
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.RepeatWrapping;
@@ -3706,7 +3851,7 @@ function addJazzToHouse(cottageGroup){
     const audioLoader = new THREE.AudioLoader();
     
     jazzMusicSound = jazzMusic;
-    jazzMusic.position.set(0, 0, 0);
+    jazzMusic.position.set(25, 0, 10);
     
     audioLoader.load(
         '/sounds/christmas-jazz.mp3',
