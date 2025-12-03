@@ -1883,7 +1883,7 @@ function createSnowmanButtons(){
 function createLabelTexture(text) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    const font = '40px Artka';
+    const font = '40px Tampico Rough';
     context.font = font;
 
     // 1. Measure text to determine canvas size
@@ -1913,11 +1913,11 @@ function createLabelTexture(text) {
 }
 
 /**
- * Creates a THREE.Sprite for the "Interact with me!" label, positioned above the snowman.
+ * Creates a THREE.Sprite for the "Click me!" label, positioned above the snowman.
  * * @returns {THREE.Sprite} The sprite object containing the text label.
  */
 function createSnowmanLabel() {
-    const text = "Interact with me!";
+    const text = "Click me!";
     const texture = createLabelTexture(text);
 
     const spriteMaterial = new THREE.SpriteMaterial({
@@ -1943,12 +1943,12 @@ function createSnowmanLabel() {
 }
 
 /**
- * Creates a THREE.Sprite for the "Interact with me!" label, positioned above the snowball pile.
+ * Creates a THREE.Sprite for the "Click me!" label, positioned above the snowball pile.
  * @returns {THREE.Sprite} The sprite object containing the text label.
  */
 function createSnowballLabel() {
     // Reusing the same text and texture generation logic
-    const text = "Interact with me!";
+    const text = "Click me!";
     const texture = createLabelTexture(text);
 
     const spriteMaterial = new THREE.SpriteMaterial({
