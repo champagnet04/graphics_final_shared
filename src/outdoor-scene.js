@@ -1943,6 +1943,37 @@ function createSnowmanLabel() {
 }
 
 /**
+ * Creates a THREE.Sprite for the "Interact with me!" label, positioned above the snowball pile.
+ * @returns {THREE.Sprite} The sprite object containing the text label.
+ */
+function createSnowballLabel() {
+    // Reusing the same text and texture generation logic
+    const text = "Interact with me!";
+    const texture = createLabelTexture(text);
+
+    const spriteMaterial = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 1.0,
+        depthTest: true // Important for visibility
+    });
+
+    const sprite = new THREE.Sprite(spriteMaterial);
+    
+    // Use the same scale for consistent look (e.g., 4 units wide)
+    const spriteWidth = 4;
+    const spriteHeight = (spriteWidth * texture.image.height) / texture.image.width;
+
+    sprite.scale.set(spriteWidth, spriteHeight, 1);
+    
+    // Position it slightly above the pile (1.5 units up from the ground)
+    sprite.position.set(0, 1.5, 0); 
+    sprite.name = 'snowballLabel';
+
+    return sprite;
+}
+
+/**
  * Creates and adds a snowman to the scene at the specified (x, z) coordinates.
  *
  * This function constructs a snowman using helper functions for each part: bottom,
@@ -3107,6 +3138,7 @@ function createSnowballPile() {
         snowball.position.set(localX, localY, localZ);
         snowballPile.add(snowball);
     }
+    snowballPile.add(createSnowballLabel());
     
     sceneObjects.push(snowballPile);
     scene.add(snowballPile);
