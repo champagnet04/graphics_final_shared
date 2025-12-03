@@ -1875,6 +1875,74 @@ function createSnowmanButtons(){
 }
 
 /**
+ * Generates a texture with the specified text rendered onto an HTML Canvas.
+ * This texture is then used by a THREE.Sprite.
+ * * @param {string} text - The text to display.
+ * @returns {THREE.CanvasTexture} The texture containing the rendered text.
+ */
+function createLabelTexture(text) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const font = '40px Artka';
+    context.font = font;
+
+    // 1. Measure text to determine canvas size
+    const metrics = context.measureText(text);
+    const textWidth = metrics.width;
+    const textHeight = 40;
+
+    // 2. Set canvas size with padding
+    canvas.width = textWidth + 20; 
+    canvas.height = textHeight + 20;
+
+    // 3. Redraw (need to set font again after resizing canvas)
+    context.font = font;
+    // Optional: Draw a subtle background for better visibility
+    context.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Semi-transparent white
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 4. Draw the text
+    context.fillStyle = 'rgba(89, 19, 19, 0.7)';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+}
+
+/**
+ * Creates a THREE.Sprite for the "Interact with me!" label, positioned above the snowman.
+ * * @returns {THREE.Sprite} The sprite object containing the text label.
+ */
+function createSnowmanLabel() {
+    const text = "Interact with me!";
+    const texture = createLabelTexture(text);
+
+    const spriteMaterial = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 1.0,
+        depthTest: true // Ensure it doesn't render through closer objects
+    });
+
+    const sprite = new THREE.Sprite(spriteMaterial);
+    
+    // Set a consistent width for the sprite and calculate height based on texture aspect ratio
+    const spriteWidth = 4; // Arbitrary size, adjust as needed
+    const spriteHeight = (spriteWidth * texture.image.height) / texture.image.width;
+
+    sprite.scale.set(spriteWidth, spriteHeight, 1);
+    
+    // Position 7.5 units up (above the hat, which is at y=6.5 relative to the group)
+    sprite.position.set(0, 7.5, 0); 
+    sprite.name = 'snowmanLabel';
+
+    return sprite;
+}
+
+/**
  * Creates and adds a snowman to the scene at the specified (x, z) coordinates.
  *
  * This function constructs a snowman using helper functions for each part: bottom,
@@ -1894,6 +1962,7 @@ function createSnowman(x, z) {
     snowmanGroup.add(createSnowmanHat());
     snowmanGroup.add(createSnowmanFace());
     snowmanGroup.add(createSnowmanButtons());
+    snowmanGroup.add(createSnowmanLabel());
     snowmanGroup.position.set(x, getHeightAt(x, z), z);
     scene.add(snowmanGroup);
     return snowmanGroup;
