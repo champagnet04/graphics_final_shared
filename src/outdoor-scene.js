@@ -1,7 +1,5 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 
 //this file will setup the outdoor scene
 //it is incredibly important that we break down EVERYTHING into as many smaller functions as possible
@@ -1231,9 +1229,9 @@ function setupSnowPoints() {
     const points = [];
     for (let i = 0; i < count; i++) {
         let particle = new THREE.Vector3(
-            Math.random() * (groundBounds.xMax - groundBounds.xMin) + groundBounds.xMin,  // x: -100 to 100
-            Math.random() * (groundBounds.yMax - groundBounds.yMin) + groundBounds.yMin,  // y: 0 to 100 (falling from above)
-            Math.random() * (groundBounds.zMax - groundBounds.zMin) + groundBounds.zMin   // z: -50 to 50
+            Math.random() * (groundBounds.xMax - groundBounds.xMin) + groundBounds.xMin,
+            Math.random() * (groundBounds.yMax - groundBounds.yMin) + groundBounds.yMin, 
+            Math.random() * (groundBounds.zMax - groundBounds.zMin) + groundBounds.zMin
         );
         points.push(particle);
     }
@@ -2358,7 +2356,6 @@ async function generateSnowmen(){
         sceneObjects
     );
     
-    // Find all snowman groups in the scene and add them to sceneObjects
     scene.traverse((child) => {
         if (child instanceof THREE.Group && child.name === 'snowmanGroup') {
             if (!sceneObjects.includes(child)) {
@@ -2715,7 +2712,7 @@ function makeFireCrackle(fire){
             
             fire.add(posSound1);
         },
-        undefined, // onProgress callback (optional)
+        undefined,
         function(error) {
             console.error('Error loading fire crackle sound:', error);
         }
@@ -2777,13 +2774,12 @@ function createPath(){
  * @returns {THREE.Vector3[]} An array of THREE.Vector3 objects representing the points of the looped path.
  */
 function getPathPoints(){
-    const PATH_CLEARANCE = 4; // Minimum distance from scene objects
-    const EDGE_CLEARANCE = 5; // Distance from scene edges
-    const POINT_COUNT = 100; // Number of points to generate for the loop
-    const REPULSION_RANGE = 15; // How far objects push the path away
-    const SMOOTHING_ITERATIONS = 3; // Number of smoothing passes
+    const PATH_CLEARANCE = 4;
+    const EDGE_CLEARANCE = 5;
+    const POINT_COUNT = 100;
+    const REPULSION_RANGE = 15;
+    const SMOOTHING_ITERATIONS = 3;
     
-    // Calculate repulsion force from all scene objects at a given point
     const getRepulsionForce = (x, z) => {
         let forceX = 0;
         let forceZ = 0;
@@ -2808,7 +2804,6 @@ function getPathPoints(){
         return { forceX, forceZ };
     };
     
-    // Keep point within bounds
     const clampToBounds = (x, z) => {
         x = Math.max(groundBounds.xMin + EDGE_CLEARANCE, Math.min(groundBounds.xMax - EDGE_CLEARANCE, x));
         z = Math.max(groundBounds.zMin + EDGE_CLEARANCE, Math.min(groundBounds.zMax - EDGE_CLEARANCE, z));
@@ -3133,6 +3128,20 @@ export function pickUpSnowball(){
     elfGroup.add(snowball);    
 }
 
+/**
+ * Calculates and builds a throw path based on mouse coordinates.
+ *
+ * This function uses the position of the mouse (in screen coordinates) to determine a 3D throw path
+ * for the snowball currently in the elf's hand. It projects a ray from the camera through the mouse
+ * coordinates, then gathers all intersections with objects in the scene to determine what, if anything,
+ * the throw would hit. The method first ensures that the elf and its group exist and that a snowball-in-hand
+ * object is found, either as a child of elfGroup or attached directly to the scene. If no valid snowball
+ * is found, the function returns null.
+ *
+ * @param {number} mouseX - The X coordinate of the mouse (in pixels, relative to the window).
+ * @param {number} mouseY - The Y coordinate of the mouse (in pixels, relative to the window).
+ * @returns {Object|null} An object describing the throw path and impact position, or null if requirements are not met.
+ */
 function createThrowPath(mouseX, mouseY){
     if (!elfGroup) {
         if (!elf) {
@@ -3429,6 +3438,20 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
     return null;
 }
 
+/**
+ * Morphs an active snowball mesh into a flattened 'splat' upon collision.
+ *
+ * This function animates the transition of a thrown snowball into its splatted form using
+ * morph targets. If a snowball throw animation is currently active, it triggers a morph
+ * on the mesh's primary morph target to visually squash the snowball, plays the splat sound,
+ * and then schedules the splat mesh to fade out and be removed after a short duration.
+ *
+ * The morph is animated smoothly over a short duration (default: 150ms) with easing,
+ * and the splat is left on the ground for 2 seconds before fading out.
+ *
+ * Safeguards are in place to ensure that the morph process only proceeds if a morphable
+ * snowball exists with valid geometry and morph targets.
+ */
 function morphSnowballIntoSplat(){
     if (!snowballThrowAnimation) {
         return;
