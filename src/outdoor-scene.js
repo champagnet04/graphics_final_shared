@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-const scene = createScene();
-const camera = setupCamera();
+let scene = createScene();
+let camera = setupCamera();
 let cameraPitch = 0;
 let ground = null;
 let pond = null;
@@ -113,7 +113,7 @@ const holidayGreetings = [
  *
  * @returns {THREE.Scene} The newly created scene instance.
  */
-function createScene(){
+function createScene() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x181848);
     return scene;
@@ -134,7 +134,7 @@ function createScene(){
  * 
  * @returns {THREE.PerspectiveCamera} Configured perspective camera
  */
-function setupCamera(){
+function setupCamera() {
     const camera = new THREE.PerspectiveCamera(
         70,
         1,
@@ -171,7 +171,7 @@ function setupCamera(){
  * 
  * No parameters. Camera is updated in-place (side effect function).
  */
-export function followElf(){
+export function followElf() {
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
     }
@@ -229,7 +229,7 @@ export function followElf(){
  * This function assumes global access to the THREE, scene objects.
  * No parameters; lights are added to the global scene as a side effect.
  */
-function setupLights(){
+function setupLights() {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
@@ -302,7 +302,7 @@ function modifyTerrainHeights(geometry) {
  *   - Updates the global `ground` variable.
  *   - Adds the ground to the global scene.
  */
-function createGround(){
+function createGround() {
     const groundGeometry = new THREE.PlaneGeometry(200, 100, 50, 25);
     
     modifyTerrainHeights(groundGeometry);
@@ -338,7 +338,6 @@ function loadSnowTexture() {
             texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(10, 10);
         },
-        undefined
     );
     
     snowTexture.wrapS = THREE.RepeatWrapping;
@@ -360,7 +359,7 @@ function loadSnowTexture() {
  * @function
  * @returns {Promise<THREE.Object3D|undefined>} Resolves to the added elf object, or undefined if loading fails.
  */
-async function generateElfAtOrigin(){
+async function generateElfAtOrigin() {
     const loader = new GLTFLoader();
     try {
         const gltf = await loader.loadAsync('/models/christmas_elf/scene.gltf');
@@ -388,6 +387,7 @@ async function generateElfAtOrigin(){
     } catch (error) {
         console.error('Cant load model:', error);
     }
+    return null;
 }
 
 /**
@@ -500,12 +500,13 @@ function checkElfCollision(x, z) {
                     return true;
                 }
             } catch (error) {
-                continue;
+                error;
             }
         }
         
         return false;
     } catch (error) {
+        error
         return false;
     }
 }
@@ -537,7 +538,7 @@ function checkElfCollision(x, z) {
  * @export
  * @function moveElf
  */
-export function moveElf(){
+export function moveElf() {
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
     }
@@ -600,6 +601,7 @@ export function moveElf(){
             elfGroup.position.z = newZ;
         }
     } catch (error) {
+        error
         if (checkGroundBounds(newX, newZ)) {
             elfGroup.position.x = newX;
             elfGroup.position.z = newZ;
@@ -631,7 +633,7 @@ export function moveElf(){
  * @export
  * @function lookAround
  */
-export function lookAround(){
+export function lookAround() {
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
     }
@@ -698,7 +700,7 @@ function getHeightFromMesh(mesh, x, z) {
  * @param {number} z - Z coordinate in world space
  * @returns {number} The Y coordinate (height) at the given position
  */
-function getHeightAt(x, z){
+function getHeightAt(x, z) {
     let groundHeight = getHeightFromMesh(ground, x, z);
     
     if (groundHeight === null) {
@@ -765,7 +767,7 @@ function initKeyboardListeners() {
     window.addEventListener('keydown', (e) => {
         const key = normalizeKey(e.key);
         if (isTrackedKey(key)) {
-                keysPressed[key] = true;
+            keysPressed[key] = true;
             e.preventDefault();
         }
     });
@@ -773,7 +775,7 @@ function initKeyboardListeners() {
     window.addEventListener('keyup', (e) => {
         const key = normalizeKey(e.key);
         if (isTrackedKey(key)) {
-                keysPressed[key] = false;
+            keysPressed[key] = false;
             e.preventDefault();
         }
     });
@@ -830,6 +832,7 @@ async function loadCottage() {
         
         return cottage;
     } catch (error) {
+        error;
         return null;
     }
 }
@@ -880,6 +883,7 @@ function getCottage() {
             return cottage;
         }
     }
+    return null;
 }
 
 /**
@@ -890,7 +894,7 @@ function getCottage() {
  *
  * @returns {THREE.Group|null} The cottage group if present, otherwise null.
  */
-function getCottageGroup(){
+function getCottageGroup() {
     const cottageGroup = scene.children.find(child => child.name === 'cottageGroup');
     if (!cottageGroup) {
         return null;
@@ -911,16 +915,16 @@ function getCottageGroup(){
  * @param {number} yOffset - Offset to add to baseY (default: 0.6)
  */
 function addEdgeLights(start, end, axis, fixed1, fixed2, baseY, spacing, points, yOffset = 0.6) {
-        for (let v = start; v <= end; v += spacing) {
-            let point;
-            if (axis === 'x') {
+    for (let v = start; v <= end; v += spacing) {
+        let point;
+        if (axis === 'x') {
             point = new THREE.Vector3(v, baseY + yOffset, fixed2);
-            } else if (axis === 'z') {
+        } else if (axis === 'z') {
             point = new THREE.Vector3(fixed1, baseY + yOffset, v);
-            }
-            points.push(point);
         }
+        points.push(point);
     }
+}
 
 /**
  * Helper function to add lights along a diagonal line between two 3D points
@@ -983,7 +987,7 @@ function addColorToLights(points, colorPalette = lightColors) {
  * @param {THREE.Vector3} center - The center position of the fence in world coordinates
  * @returns {THREE.Vector3[]} Array of points where lights should be placed along the fence edges
  */
-function addLightsToFence(size, center){
+function addLightsToFence(size, center) {
     const points = [];
     const spacing = 0.3;
     
@@ -1023,7 +1027,7 @@ function addLightsToFence(size, center){
  * @param {THREE.Vector3} center - The center position of the fence in world coordinates
  * @returns {THREE.Vector3[]} Array of points along the top fence sections for attaching lights
  */
-function addLightsToTopFence(size, center){
+function addLightsToTopFence(size, center) {
     const points = [];
     const spacing = 0.3;
     
@@ -1055,7 +1059,7 @@ function addLightsToTopFence(size, center){
  * @param {THREE.Vector3} center - The center position of the roof in world coordinates
  * @returns {THREE.Vector3[]} Array of points along the back roof edge for attaching lights
  */
-function addLightsToRoofBackEdge(size, center){
+function addLightsToRoofBackEdge(size, center) {
     const points = [];
     const spacing = 0.3;
     
@@ -1085,7 +1089,7 @@ function addLightsToRoofBackEdge(size, center){
  * @param {THREE.Vector3} center - The center position of the roof in world coordinates
  * @returns {THREE.Vector3[]} Array of points along the left and right front roof diagonal edges for attaching lights
  */
-function addLightsToRoofEdges(size, center){
+function addLightsToRoofEdges(size, center) {
     const points = [];
     const spacing = 0.3;
     
@@ -1169,7 +1173,7 @@ function addLightsToRoofEdges(size, center){
  *   undefined if lights added successfully,
  *   null if the cottage is not found.
  */
-function addChristmasLightsToCottage(){
+function addChristmasLightsToCottage() {
     const cottage = getCottage();
     const cottageGroup = getCottageGroup();
     
@@ -1206,7 +1210,7 @@ function addChristmasLightsToCottage(){
     if (cottageGroup) {
         cottageGroup.add(christmasLights);
     } else {
-    scene.add(christmasLights);
+        scene.add(christmasLights);
     }
 }
 
@@ -1269,7 +1273,7 @@ function setupSnowPoints() {
  * 
  * Should be called once during scene setup to enable continuous snow.
  */
-function generateSnow(){
+function generateSnow() {
     const snowPoints = setupSnowPoints();
     scene.add(snowPoints);
 }
@@ -1296,7 +1300,7 @@ const wrapBoundary = (value, min, max) => value < min ? max : value > max ? min 
  * Particle positions are also wrapped around the scene boundaries on the x and z axes.
  * The geometry is marked to update so Three.js will redraw the updated particles.
  */
-export function updateSnow(){
+export function updateSnow() {
     const snow = scene.children.find(child => child.name === 'snow');
     if (!snow) {
         return;
@@ -1505,7 +1509,7 @@ function createNorthernLights() {
  * 
  * @returns {THREE.Texture} The loaded and configured ice texture.
  */
-function loadIceTexture(){
+function loadIceTexture() {
     const loader = new THREE.TextureLoader();
     const iceTexture = loader.load(
         '/textures/ice.png',
@@ -1514,7 +1518,6 @@ function loadIceTexture(){
             texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(10, 10);
         },
-        undefined,
         (error) => {
             console.error('Error loading ice texture:', error);
         }
@@ -1555,7 +1558,7 @@ function createSnowmanBottom() {
  *
  * @returns {THREE.Mesh} The mesh representing the snowman's middle sphere.
  */
-function createSnowmanMiddle(){
+function createSnowmanMiddle() {
     const snowmanMiddle = new THREE.Mesh(ballGeometry, snowMaterial);
     snowmanMiddle.scale.setScalar(1.5);
     snowmanMiddle.position.set(0, 3, 0);
@@ -1576,7 +1579,7 @@ function createSnowmanMiddle(){
  *
  * @returns {THREE.Mesh} The mesh representing the snowman's top sphere.
  */
-function createSnowmanTop(){
+function createSnowmanTop() {
     const snowmanTop = new THREE.Mesh(ballGeometry, snowMaterial);
     snowmanTop.position.set(0, 5, 0);
     snowmanTop.castShadow = true;
@@ -1595,7 +1598,7 @@ function createSnowmanTop(){
  *
  * @returns {THREE.Group} The group representing the snowman's hat, ready to be added to the snowman or scene.
  */
-function createSnowmanHat(){
+function createSnowmanHat() {
     const snowmanHat = new THREE.Group();
     snowmanHat.add(createSnowmanHatBottom());
     snowmanHat.add(createSnowmanHatTop());
@@ -1616,7 +1619,7 @@ function createSnowmanHat(){
  *
  * @returns {THREE.Mesh} The mesh representing the bottom of the snowman's hat.
  */
-function createSnowmanHatBottom(){
+function createSnowmanHatBottom() {
     const snowmanHatBottom = new THREE.Mesh(bottomHatGeometry, blackMaterial);
     snowmanHatBottom.position.set(0, 6, 0);
     snowmanHatBottom.castShadow = true;
@@ -1636,7 +1639,7 @@ function createSnowmanHatBottom(){
  *
  * @returns {THREE.Mesh} The mesh representing the top cylinder of the snowman's hat.
  */
-function createSnowmanHatTop(){
+function createSnowmanHatTop() {
     const snowmanHatTop = new THREE.Mesh(topHatGeometry, blackMaterial);
     snowmanHatTop.position.set(0, 6.5, 0);
     snowmanHatTop.castShadow = true;
@@ -1658,7 +1661,7 @@ function createSnowmanHatTop(){
  *                                For example, use 0.15 for buttons that should be 1.5x larger than eyes.
  * @returns {THREE.Mesh} The mesh representing a single coal piece.
  */
-function createCoalPiece(scale = 0.1){
+function createCoalPiece(scale = 0.1) {
     const coalPiece = new THREE.Mesh(ballGeometry, blackMaterial);
     coalPiece.scale.setScalar(scale);
     coalPiece.castShadow = true;
@@ -1676,7 +1679,7 @@ function createCoalPiece(scale = 0.1){
  *
  * @returns {THREE.Group} A group containing the two eye meshes for the snowman face.
  */
-function createSnowmanEyes(){
+function createSnowmanEyes() {
     const eyesGroup = new THREE.Group();
     const snowmanEye1 = createCoalPiece();
     const snowmanEye2 = createCoalPiece();
@@ -1697,7 +1700,7 @@ function createSnowmanEyes(){
  *
  * @returns {THREE.Mesh} The mesh representing the snowman's carrot nose.
  */
-function createSnowmanNose(){
+function createSnowmanNose() {
     const snowmanNose = new THREE.Mesh(noseGeometry, noseMaterial);
     snowmanNose.position.set(0, 5, 1.25);
     snowmanNose.rotation.x = Math.PI / 2;
@@ -1720,7 +1723,7 @@ function createSnowmanNose(){
  *
  * @returns {THREE.Group} A group containing the five meshes forming the snowman's smile.
  */
-function createSnowmanSmile(){
+function createSnowmanSmile() {
     const smileGroup = new THREE.Group();
     const piece1 = createCoalPiece();
     const piece2 = createCoalPiece();
@@ -1752,7 +1755,7 @@ function createSnowmanSmile(){
  *
  * @returns {THREE.Group} A group containing the snowman's facial features.
  */
-function createSnowmanFace(){
+function createSnowmanFace() {
     const faceGroup = new THREE.Group();
     faceGroup.add(createSnowmanEyes());
     faceGroup.add(createSnowmanNose());
@@ -1775,7 +1778,7 @@ function createSnowmanFace(){
  *
  * @returns {THREE.Group} A group containing the three snowman button meshes.
  */
-function createSnowmanButtons(){
+function createSnowmanButtons() {
     const buttonsGroup = new THREE.Group();
     const button1 = createCoalPiece(0.15);
     const button2 = createCoalPiece(0.15);
@@ -1913,7 +1916,7 @@ function createSnowman(x, z) {
  *
  * @returns {THREE.Mesh} The mesh representing the tree trunk.
  */
-function createTreeTrunk(){
+function createTreeTrunk() {
     const trunkMesh = new THREE.Mesh(trunkGeometry, trunkMaterial);
     trunkMesh.position.set(0, 0.5, 0);
     trunkMesh.castShadow = true;
@@ -1930,7 +1933,7 @@ function createTreeTrunk(){
  *
  * @returns {THREE.Mesh} The mesh representing the bottom foliage section of the pine tree.
  */
-function createTreeBottom(){
+function createTreeBottom() {
     const bottomMesh = new THREE.Mesh(treeBottomGeometry, treeMaterial);
     bottomMesh.position.set(0, 2, 0);
     bottomMesh.castShadow = true;
@@ -1947,7 +1950,7 @@ function createTreeBottom(){
  *
  * @returns {THREE.Mesh} The mesh representing the middle foliage section of the pine tree.
  */
-function createTreeMiddle(){
+function createTreeMiddle() {
     const middleMesh = new THREE.Mesh(treeMiddleGeometry, treeMaterial);
     middleMesh.position.set(0, 4.25, 0);
     middleMesh.castShadow = true;
@@ -1964,7 +1967,7 @@ function createTreeMiddle(){
  *
  * @returns {THREE.Mesh} The mesh representing the top foliage section of the pine tree.
  */
-function createTreeTop(){
+function createTreeTop() {
     const topMesh = new THREE.Mesh(treeTopGeometry, treeMaterial);
     topMesh.position.set(0, 6.5, 0);
     topMesh.castShadow = true;
@@ -1983,7 +1986,7 @@ function createTreeTop(){
  *
  * @returns {THREE.Mesh} The mesh representing the bottom snow layer of the tree.
  */
-function createBottomTreeSnow(){
+function createBottomTreeSnow() {
     const bottomSnowMesh = new THREE.Mesh(bottomSnowGeometry, snowMaterial);
     bottomSnowMesh.position.set(0, 1, 0);
     bottomSnowMesh.castShadow = true;
@@ -2002,7 +2005,7 @@ function createBottomTreeSnow(){
  *
  * @returns {THREE.Mesh} The mesh representing the middle snow layer of the tree.
  */
-function createMiddleTreeSnow(){
+function createMiddleTreeSnow() {
     const middleSnowMesh = new THREE.Mesh(middleSnowGeometry, snowMaterial);
     middleSnowMesh.position.set(0, 3.25, 0);
     middleSnowMesh.castShadow = true;
@@ -2021,7 +2024,7 @@ function createMiddleTreeSnow(){
  *
  * @returns {THREE.Mesh} The mesh representing the top snow layer of the tree.
  */
-function createTopTreeSnow(){
+function createTopTreeSnow() {
     const topSnowMesh = new THREE.Mesh(topSnowGeometry, snowMaterial);
     topSnowMesh.position.set(0, 5.25, 0);
     topSnowMesh.castShadow = true;
@@ -2041,7 +2044,7 @@ function createTopTreeSnow(){
  *
  * @returns {THREE.Group} A THREE.Group containing all the snow layers for the tree.
  */
-function createTreeSnow(){
+function createTreeSnow() {
     const snowGroup = new THREE.Group();
     snowGroup.add(createBottomTreeSnow());
     snowGroup.add(createMiddleTreeSnow());
@@ -2063,7 +2066,7 @@ function createTreeSnow(){
  * @returns {Promise<THREE.Object3D | undefined>} A promise that resolves to the cloned and prepared star
  *   Object3D, or undefined if loading fails.
  */
-async function loadTreeStar(){
+async function loadTreeStar() {
     const loader = new GLTFLoader();
     try {
         const gltf = await loader.loadAsync('/models/christmas_star/scene.gltf');
@@ -2113,7 +2116,7 @@ async function loadTreeStar(){
  * @returns {THREE.Group} A THREE.Group containing sprites representing the tree's lights,
  *   ready to be added to a tree object.
  */
-function createTreeLights(){
+function createTreeLights() {
     const lightsGroup = new THREE.Group();
 
     const segments = [
@@ -2189,7 +2192,7 @@ function createTreeLights(){
  * @param {number} z - The Z coordinate for the tree location.
  * @returns {Promise<THREE.Group>} The assembled THREE.Group representing the complete tree.
  */
-async function createTree(x, z){
+async function createTree(x, z) {
     const treeGroup = new THREE.Group();
     treeGroup.name = 'treeGroup';
     treeGroup.add(createTreeTrunk());
@@ -2345,7 +2348,7 @@ async function generateItem(count, spacing, minDistanceFromStructures, createFun
  * @async
  * @returns {Promise<void>} Resolves when all snowmen have been placed and the sceneObjects array is updated.
  */
-async function generateSnowmen(){
+async function generateSnowmen() {
     const SNOWMAN_COUNT = 7;
     const SNOWMAN_MIN_DIST = 6;
     const SNOWMAN_SPACING = 8;
@@ -2384,7 +2387,7 @@ async function generateSnowmen(){
  * @async
  * @returns {Promise<void>} Resolves when all trees have been placed and the sceneObjects array is updated.
  */
-async function generateTrees(){
+async function generateTrees() {
     const TREE_COUNT = 10;
     const TREE_SPACING = 10;
     const TREE_MIN_DIST = 6;
@@ -2423,7 +2426,7 @@ async function generateTrees(){
  * @function
  * @returns {Promise<THREE.Object3D|null>} A promise that resolves to the campfire Object3D if loaded successfully, otherwise null.
  */
-async function loadCampfire(){
+async function loadCampfire() {
     const loader = new GLTFLoader();
     try {
         const gltf = await loader.loadAsync('/models/campfire/scene.gltf');
@@ -2498,7 +2501,7 @@ async function createCampfire() {
  * @function
  * @returns {Promise<THREE.Object3D|null>} The loaded log object, or null if loading fails.
  */
-async function loadLog(){
+async function loadLog() {
     const loader = new GLTFLoader();
     try {
         const gltf = await loader.loadAsync('/models/log/scene.gltf');
@@ -2535,7 +2538,7 @@ async function loadLog(){
  * @function
  * @returns {Promise<THREE.Group>} The group containing all the log objects placed around the campfire.
  */
-async function addLogsAroundCampfire(){
+async function addLogsAroundCampfire() {
     const logGroup = new THREE.Group();
     
     const log1 = await loadLog();
@@ -2689,7 +2692,7 @@ export function checkCottageProximity() {
  * @param {THREE.Group} fire - The campfire group to which the crackle sound should be attached.
  * @returns {void}
  */
-function makeFireCrackle(fire){
+function makeFireCrackle(fire) {
     if (!audioListener) {
         audioListener = new THREE.AudioListener();
         camera.add(audioListener);
@@ -2714,14 +2717,13 @@ function makeFireCrackle(fire){
             
             fire.add(posSound1);
         },
-        undefined,
-        function(error) {
+        function (error) {
             console.error('Error loading fire crackle sound:', error);
         }
     );
 }
 
-async function loadPeppermint(){
+async function loadPeppermint() {
     const loader = new GLTFLoader();
     try {
         const gltf = await loader.loadAsync('/models/peppermint_candy/scene.gltf');
@@ -2758,7 +2760,7 @@ async function loadPeppermint(){
  *
  * @returns {THREE.CatmullRomCurve3} The closed Catmull-Rom curve representing the scene path.
  */
-function createPath(){
+function createPath() {
     const path = new THREE.CatmullRomCurve3(getPathPoints(), true);
 
     return path;
@@ -2775,7 +2777,7 @@ function createPath(){
  *
  * @returns {THREE.Vector3[]} An array of THREE.Vector3 objects representing the points of the looped path.
  */
-function getPathPoints(){
+function getPathPoints() {
     const PATH_CLEARANCE = 4;
     const EDGE_CLEARANCE = 5;
     const POINT_COUNT = 100;
@@ -2896,7 +2898,7 @@ function getPathPoints(){
  * @param {THREE.Curve} path - The path along which to distribute the candies. Should support getPoint(t).
  * @returns {Promise<THREE.Group|undefined>} Returns a Promise resolving to the group containing all placed candies, or undefined if the model fails to load.
  */
-async function addCandyToPath(path){
+async function addCandyToPath(path) {
     const candies = new THREE.Group();
     const candyCount = 200;
     
@@ -2915,7 +2917,6 @@ async function addCandyToPath(path){
     }
     
     scene.add(candies);
-    return candies;
 }
 
 /**
@@ -2928,7 +2929,7 @@ async function addCandyToPath(path){
  * @export
  * @function
  */
-export function makeSnowmanSpeak(){
+export function makeSnowmanSpeak() {
     const greeting = holidayGreetings[Math.floor(Math.random() * holidayGreetings.length)];
     const speech = new SpeechSynthesisUtterance(greeting);
     
@@ -2963,7 +2964,7 @@ export function makeSnowmanSpeak(){
  *
  * @returns {THREE.Mesh} The snowball mesh with morph target.
  */
-function createSnowball(){
+function createSnowball() {
     const geometry = snowballGeometry.clone();
     
     const positionAttribute = geometry.attributes.position;
@@ -3038,7 +3039,7 @@ function createSnowballPile() {
  * 
  * @returns {boolean} True if a snowball is found in hand, false otherwise.
  */
-export function hasSnowballInHand(){
+export function hasSnowballInHand() {
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
         if (!elf) {
@@ -3093,7 +3094,7 @@ export function hasSnowballInHand(){
  * @export
  * @function pickUpSnowball
  */
-export function pickUpSnowball(){
+export function pickUpSnowball() {
     if (!elf) {
         elf = scene.children.find(child => child.name === 'elf');
         if (!elf) {
@@ -3144,7 +3145,7 @@ export function pickUpSnowball(){
  * @param {number} mouseY - The Y coordinate of the mouse (in pixels, relative to the window).
  * @returns {Object|null} An object describing the throw path and impact position, or null if requirements are not met.
  */
-function createThrowPath(mouseX, mouseY){
+function createThrowPath(mouseX, mouseY) {
     if (!elfGroup) {
         if (!elf) {
             elf = scene.children.find(child => child.name === 'elf');
@@ -3196,7 +3197,7 @@ function createThrowPath(mouseX, mouseY){
             const objIntersects = raycaster.intersectObject(obj, true);
             intersects.push(...objIntersects);
         } catch (e) {
-            continue;
+            e;
         }
     }
     
@@ -3205,6 +3206,7 @@ function createThrowPath(mouseX, mouseY){
             const groundIntersects = raycaster.intersectObject(ground, false);
             intersects.push(...groundIntersects);
         } catch (e) {
+            e
         }
     }
     
@@ -3239,7 +3241,7 @@ function createThrowPath(mouseX, mouseY){
  * @param {number} x - The X coordinate (in pixels) of the user's intended target on the screen.
  * @param {number} y - The Y coordinate (in pixels) of the user's intended target on the screen.
  */
-export function throwSnowball(x, y){
+export function throwSnowball(x, y) {
     if (snowballThrowAnimation) {
         return;
     }
@@ -3315,7 +3317,7 @@ export function throwSnowball(x, y){
  * @export
  * @function updateSnowballThrow
  */
-export function updateSnowballThrow(){
+export function updateSnowballThrow() {
     if (!snowballThrowAnimation) {
         return;
     }
@@ -3396,6 +3398,7 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
     try {
         intersects = raycaster.intersectObjects(objectsToCheck, true);
     } catch (error) {
+        error
         for (const obj of objectsToCheck) {
             try {
                 if (obj.type === 'Sprite') {
@@ -3404,7 +3407,7 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
                 const objIntersects = raycaster.intersectObject(obj, true);
                 intersects.push(...objIntersects);
             } catch (e) {
-                continue;
+                e;
             }
         }
     }
@@ -3412,16 +3415,6 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
     if (intersects.length > 0) {
         intersects.sort((a, b) => a.distance - b.distance);
         const closestHit = intersects[0];
-        
-        if (closestHit.object && closestHit.object.name && closestHit.object.name.includes('tree')) {
-            console.log('Tree intersection found:', {
-                distance: closestHit.distance,
-                snowballRadius: snowballRadius,
-                pathDistance: distance,
-                condition: `${closestHit.distance} >= ${snowballRadius} && ${closestHit.distance} <= ${distance + snowballRadius}`,
-                passes: closestHit.distance >= snowballRadius && closestHit.distance <= distance + snowballRadius
-            });
-        }
         
         if (closestHit.distance >= 0 && closestHit.distance <= distance + snowballRadius) {
             const hitPoint = closestHit.point.clone();
@@ -3454,7 +3447,7 @@ function checkSnowballCollisionAlongPath(previousPosition, currentPosition) {
  * Safeguards are in place to ensure that the morph process only proceeds if a morphable
  * snowball exists with valid geometry and morph targets.
  */
-function morphSnowballIntoSplat(){
+function morphSnowballIntoSplat() {
     if (!snowballThrowAnimation) {
         return;
     }
@@ -3564,16 +3557,13 @@ function makeSplatSound() {
     
     audioLoader.load(
         '/sounds/splat.mp3',
-        function(buffer) {
+        function (buffer) {
             splatSound.setBuffer(buffer);
             splatSound.setVolume(0.7);
             splatSound.setLoop(false);
             
             resumeAudioContext();
             splatSound.play();
-        },
-        function(error) {
-            console.error('Error loading splat sound:', error);
         }
     );
 }
@@ -3590,7 +3580,7 @@ function makeSplatSound() {
  *
  * @returns {THREE.Texture} The configured wall texture ready to use in a material.
  */
-function loadWallTexture(){
+function loadWallTexture() {
     const loader = new THREE.TextureLoader();
     const wallTexture = loader.load(
         '/textures/mountains.webp',
@@ -3599,9 +3589,8 @@ function loadWallTexture(){
             texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(1, 1);
         },
-        undefined,
         (error) => {
-            console.error('Error loading wall texture:', error);
+            error;
         }
     );
     
@@ -3689,7 +3678,7 @@ function createWall(wallCorners, wallName) {
  *
  * @returns {THREE.Vector3[]} An array of four THREE.Vector3 instances corresponding to ground corners.
  */
-function determineWallCorners(){
+function determineWallCorners() {
     const groundCorners = [];
     const frontLeftCorner = new THREE.Vector3(groundBounds.xMin, 0, groundBounds.zMin);
     const frontRightCorner = new THREE.Vector3(groundBounds.xMax, 0, groundBounds.zMin);
@@ -3714,7 +3703,7 @@ function determineWallCorners(){
  *
  * @returns {THREE.Vector3[]} An array containing [frontLeftCorner, frontRightCorner].
  */
-function determineFrontWallBounds(){
+function determineFrontWallBounds() {
     const wallCorners = determineWallCorners();
     const frontWallCorners = [];
     const frontLeftCorner = wallCorners[0];
@@ -3734,7 +3723,7 @@ function determineFrontWallBounds(){
  *
  * @returns {THREE.Vector3[]} An array containing [backLeftCorner, backRightCorner].
  */
-function determineBackWallBounds(){
+function determineBackWallBounds() {
     const wallCorners = determineWallCorners();
     const backWallCorners = [];
     const backLeftCorner = wallCorners[2];
@@ -3754,7 +3743,7 @@ function determineBackWallBounds(){
  *
  * @returns {THREE.Vector3[]} An array containing [leftFrontCorner, leftBackCorner].
  */
-function determineLeftWallBounds(){
+function determineLeftWallBounds() {
     const wallCorners = determineWallCorners();
     const leftWallCorners = [];
     const leftFrontCorner = wallCorners[0];
@@ -3774,7 +3763,7 @@ function determineLeftWallBounds(){
  *
  * @returns {THREE.Vector3[]} An array containing [rightFrontCorner, rightBackCorner].
  */
-function determineRightWallBounds(){
+function determineRightWallBounds() {
     const wallCorners = determineWallCorners();
     const rightWallCorners = [];
     const rightFrontCorner = wallCorners[1];
@@ -3807,7 +3796,7 @@ function determineRightWallBounds(){
  *
  * @returns {void}
  */
-function generateWalls(){
+function generateWalls() {
     const frontWall = createWall(determineFrontWallBounds(), 'frontWall');
     const backWall = createWall(determineBackWallBounds(), 'backWall');
     const leftWall = createWall(determineLeftWallBounds(), 'leftWall');
@@ -3833,7 +3822,7 @@ function generateWalls(){
  * @param {THREE.Group} cottageGroup - The 3D group representing the cottage to which the jazz music should be added as a positional audio source.
  * @returns {void}
  */
-function addJazzToHouse(cottageGroup){
+function addJazzToHouse(cottageGroup) {
     if (!cottageGroup) {
         return;
     }
@@ -3851,7 +3840,7 @@ function addJazzToHouse(cottageGroup){
     
     audioLoader.load(
         '/sounds/christmas-jazz.mp3',
-        function(buffer) {
+        function (buffer) {
             jazzMusic.setBuffer(buffer);
             jazzMusic.setRefDistance(30);
             jazzMusic.setMaxDistance(100);
@@ -3860,8 +3849,7 @@ function addJazzToHouse(cottageGroup){
             jazzMusic.setVolume(0.4);
             
             scene.add(jazzMusic);
-        },
-        undefined
+        }
     );
 }
 
@@ -3895,7 +3883,7 @@ function addJazzToHouse(cottageGroup){
  * @function setupOutdoorScene
  * @returns {Promise<{scene: THREE.Scene, camera: THREE.Camera}>} The initialized scene and camera.
  */
-export async function setupOutdoorScene(){    
+export async function setupOutdoorScene() {    
     setupLights();
     createGround();
     await generateElfAtOrigin();
