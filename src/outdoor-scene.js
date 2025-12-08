@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-//this file will setup the outdoor scene
-//it is incredibly important that we break down EVERYTHING into as many smaller functions as possible
 const scene = createScene();
 const camera = setupCamera();
 let cameraPitch = 0;
@@ -209,6 +207,10 @@ export function followElf(){
     const lookY = baseLookY + pitchOffset;
     
     camera.lookAt(lookX, lookY, lookZ);
+
+    if (audioListener) {
+        audioListener.updateMatrixWorld();
+    }
 }
 
 /**
@@ -2655,7 +2657,7 @@ export function checkCottageProximity() {
     }
     
     const distance = elfGroup.position.distanceTo(cottageGroup.position);
-    const proximityRadius = 40;
+    const proximityRadius = 150;
     
     if (distance <= proximityRadius) {
         resumeAudioContext();
@@ -3845,19 +3847,19 @@ function addJazzToHouse(cottageGroup){
     const audioLoader = new THREE.AudioLoader();
     
     jazzMusicSound = jazzMusic;
-    jazzMusic.position.set(25, 0, 10);
+    jazzMusic.position.set(25, getHeightAt(25, 10), 10);
     
     audioLoader.load(
         '/sounds/christmas-jazz.mp3',
         function(buffer) {
             jazzMusic.setBuffer(buffer);
-            jazzMusic.setRefDistance(5);
-            jazzMusic.setMaxDistance(40);
+            jazzMusic.setRefDistance(30);
+            jazzMusic.setMaxDistance(100);
             jazzMusic.setRolloffFactor(8);
             jazzMusic.setLoop(true);
             jazzMusic.setVolume(0.4);
             
-            cottageGroup.add(jazzMusic);
+            scene.add(jazzMusic);
         },
         undefined
     );
